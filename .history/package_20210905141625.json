@@ -1,0 +1,41 @@
+{
+  "name": "habib-backend",
+  "version": "1.0.0",
+  "description": "backend for salon app",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon index.js"
+  },
+  "author": "Ankit Singh",
+  "license": "ISC",
+  "dependencies": {
+    "@fortawesome/angular-fontawesome": "^0.8.2",
+    "@fortawesome/fontawesome-svg-core": "^1.2.35",
+    "@fortawesome/free-solid-svg-icons": "^5.15.3",
+    "angular-font-awesome": "^3.1.2",
+    "base64topdf": "^1.1.8",
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.19.0",
+    "cookie-parser": "^1.4.5",
+    "cors": "^2.8.5",
+    "custom-id": "^1.2.0",
+    "express": "^4.17.1",
+    "helmet": "^4.4.1",
+    "jsonwebtoken": "^8.5.1",
+    "moment": "^2.29.1",
+    "moment-timezone": "^0.5.33",
+    "mongoose": "^5.12.1",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.2",
+    "node-cron": "^3.0.0",
+    "nodemailer": "^6.5.0",
+    "nodemon": "^2.0.7",
+    "pino": "^6.11.2",
+    "shortid": "^2.2.16"
+  },
+  "engines": {
+    "node": "10.x",
+    "npm": "6.x"
+  }
+}
