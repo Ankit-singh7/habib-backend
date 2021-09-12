@@ -150,8 +150,6 @@ let createBill = (req, res) => {
         customer_alternative_phone: req.body.customer_alternative_phone,
         customer_address: req.body.customer_address,
         payment_mode: req.body.payment_mode,
-        employee_id: req.body.employee_id,
-        employee_name: req.body.employee_name,
         total_price: req.body.total_price,
         booking_amount: req.body.booking_amount,
         products: req.body.products,
@@ -213,7 +211,7 @@ let createBill = (req, res) => {
                  })
             }
             for(let item of req.body.products) {
-                productSalesReportModel.findOne({'date': time.getNormalTime(),'product_id': item.product_id,'branch_id': req.body.branch_id,'employee_id': req.body.employee_id}).exec((err,result) => {
+                productSalesReportModel.findOne({'date': time.getNormalTime(),'product_id': item.product_id,'branch_id': req.body.branch_id,'employee_id': item.employee_id}).exec((err,result) => {
                    if(err){
                        console.log(err)
                    } else if (check.isEmpty(result)) {
@@ -224,8 +222,8 @@ let createBill = (req, res) => {
                         product_id: item.product_id,
                         branch_id: req.body.branch_id,
                         branch_name: req.body.branch_name,
-                        employee_id: req.body.employee_id,
-                        employee_name: req.body.employee_name,
+                        employee_id: item.employee_id,
+                        employee_name: item.employee_name,
                         quantity: Number(item.quantity)
                        })
                        sales.save((err,result) => {
@@ -252,7 +250,7 @@ let createBill = (req, res) => {
                })
             }
             for(let item of req.body.services) {
-                serviceSalesReportModel.findOne({'date': time.getNormalTime(),'service_id': item.product_id,'branch_id': req.body.branch_id,'employee_id':req.body.employee_id}).exec((err,result) => {
+                serviceSalesReportModel.findOne({'date': time.getNormalTime(),'service_id': item.product_id,'branch_id': req.body.branch_id,'employee_id':item.employee_id}).exec((err,result) => {
                    if(err){
                        console.log(err)
                    } else if (check.isEmpty(result)) {
@@ -263,8 +261,8 @@ let createBill = (req, res) => {
                         service_id: item.service_id,
                         branch_id: req.body.branch_id,
                         branch_name: req.body.branch_name,
-                        employee_id: req.body.employee_id,
-                        employee_name: req.body.employee_name,
+                        employee_id: item.employee_id,
+                        employee_name: item.employee_name,
                         quantity: Number(item.quantity)
                        })
                        sales.save((err,result) => {

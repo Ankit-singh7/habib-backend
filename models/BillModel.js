@@ -79,7 +79,19 @@ let billSchema = new Schema(
                quantity:{
                    type:Number,
                    default:null
-               }
+               },
+               employee_id:{
+                type:String,
+                default:''
+              },
+              employee_name:{
+                type:String,
+                default:''
+              },
+              total:{
+                type:Number,
+                default:null
+              }
             }
         ],
         services: [
@@ -93,6 +105,18 @@ let billSchema = new Schema(
                  default:''
                 },
                 quantity:{
+                    type:Number,
+                    default:null
+                },
+                employee_id:{
+                    type:String,
+                    default:''
+                },
+                employee_name:{
+                    type:String,
+                    default:''
+                },
+                total:{
                     type:Number,
                     default:null
                 }
