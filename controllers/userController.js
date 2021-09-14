@@ -280,7 +280,7 @@ let createUser = (req,res) => {
                                     resolve(newUserObj)
                                 }
                             })
-                        } else if(req.body.role === 'operator' || req.body.role === 'admin' || req.body.role === 'stock_manager') {
+                        } else if(req.body.role === 'operator') {
                             let branch_name;
                             branchModel.findOne({'branch_id':req.body.branch_id}).exec((err,result) => {
                                 if(err) {
@@ -314,6 +314,32 @@ let createUser = (req,res) => {
                                             resolve(newUserObj)
                                         }
                                     })
+                                }
+                            })
+                        } else if(req.body.role === 'admin') {
+                            payload = {
+                                user_id: shortid.generate(),
+                                f_name: req.body.f_name,
+                                l_name: req.body.l_name || '',
+                                email: req.body.email.toLowerCase(),
+                                password:req.body.password,
+                                phone: req.body.phone,
+                                role: req.body.role,
+                                createdOn: time.now()
+                            }
+
+                            let newUser = new UserModel(payload)
+                            newUser.save((err, newUser) => {
+                                if (err) {
+                                    console.log(err)
+                                    logger.error(err.message, 'userController: createUser', 10)
+                                    let apiResponse = response.generate(true, 'Failed to create new User', 500, null)
+                                    reject(apiResponse)
+                                } else {
+                                    let newUserObj = newUser.toObject();
+                                  
+    
+                                    resolve(newUserObj)
                                 }
                             })
                         } 
