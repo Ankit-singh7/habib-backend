@@ -63,6 +63,14 @@ let createBranch = (req,res) => {
         branch_name: req.body.name,
         branch_address: req.body.address,
         branch_phone: req.body.phone,
+        branch_start_timing: req.body.branch_start_timing,
+        branch_end_timing: req.body.branch_end_timing,
+        branch_gst: req.body.branch_gst,
+        footer_1: req.body.footer_1,
+        footer_2: req.body.footer_2,
+        footer_3: req.body.footer_3,
+        google_link: req.body.google_link,
+        facebook_link: req.body.facebook_link,
         createdOn: time.now()
     })
 

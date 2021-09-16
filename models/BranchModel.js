@@ -22,6 +22,38 @@ let branchSchema = new Schema(
    type:String,
    default:''
  },
+ branch_start_timing:{
+   type: String,
+   default:''
+ },
+ branch_end_timing:{
+  type: String,
+  default:''
+ },
+ branch_gst:{
+  type: String,
+  default:''
+ },
+ footer_1:{
+  type: String,
+  default:''
+ },
+ footer_2:{
+  type: String,
+  default:''
+ },
+ footer_3:{
+  type: String,
+  default:''
+ },
+ google_link:{
+  type: String,
+  default:'' 
+ },
+ facebook_link:{
+  type: String,
+  default:'' 
+ },
  createdOn :{
    type:Date,
    default:""
