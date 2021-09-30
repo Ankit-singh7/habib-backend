@@ -181,21 +181,56 @@ let deleteService = (req,res) => {
 
 let updateService = (req,res) => {
     let option = req.body
-    serviceModel.updateOne({'service_id':req.params.id},option,{multi:true})
-    .exec((err,result) => {
-        if (err) {
-            console.log(err)
-            logger.error(err.message, 'Branch Controller: branch', 10)
-            let apiResponse = response.generate(true, 'Failed To update branch', 500, null)
-            res.send(apiResponse)
-        } else if (check.isEmpty(result)) {
-            logger.info('No Branch Found', 'Branch Controller: branch')
-            let apiResponse = response.generate(true, 'No Detail Found', 404, null)
-            res.send(apiResponse)
-        } else {
-            let apiResponse = response.generate(false, 'Branch Successfully updated', 200, result)
-            res.send(apiResponse)
-        }
+
+    let service_type_name;
+
+    let findServiceType = () => {
+        return new Promise((resolve,reject) => {
+            serviceTypeModel.find({'service_type_id': req.body.service_type_id}).exec((err,result) => {
+                if(err) {
+                   console.log(err)
+                   reject('service type not found')
+                } else {
+                    service_type_name = result[0].name
+                    resolve('found type')
+                }
+            })
+        })
+    }
+
+    let updateService = () => {
+        return new Promise((resolve,reject) => {
+            option.service_type_name = service_type_name
+            serviceModel.updateOne({'service_id':req.params.id},option,{multi:true})
+           .exec((err,result) => {
+               if (err) {
+                   console.log(err)
+                   logger.error(err.message, 'Branch Controller: branch', 10)
+                   let apiResponse = response.generate(true, 'Failed To update branch', 500, null)
+                   reject(apiResponse)
+               } else if (check.isEmpty(result)) {
+                   logger.info('No Branch Found', 'Branch Controller: branch')
+                   let apiResponse = response.generate(true, 'No Detail Found', 404, null)
+                   resolve(apiResponse)
+               } else {
+                   let apiResponse = response.generate(false, 'Branch Successfully updated', 200, result)
+                   resolve(apiResponse)
+               }
+           })
+        })
+    }
+
+    findServiceType(req,res)
+    .then(updateService)
+    .then((resolve) => {
+        let apiResponse = response.generate(false, 'Service Updated Successfully', 200, resolve)
+        res.status(200)
+        res.send(apiResponse)
+       }).catch((err) => {
+        console.log("errorhandler");
+        console.log(err);
+        res.status(err.status)
+        res.send(err)
     })
 }
 

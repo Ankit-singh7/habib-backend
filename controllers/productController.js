@@ -183,22 +183,53 @@ let deleteProduct = (req,res) => {
 
 let updateProduct = (req,res) => {
     let option = req.body
-    productModel.updateOne({'product_id':req.params.id},option,{multi:true})
-    .exec((err,result) => {
-        if (err) {
-            console.log(err)
-            logger.error(err.message, 'Product Controller: branch', 10)
-            let apiResponse = response.generate(true, 'Failed To update Product', 500, null)
-            res.send(apiResponse)
-        } else if (check.isEmpty(result)) {
-            logger.info('No Product Found', 'Product Controller: Product')
-            let apiResponse = response.generate(true, 'No Detail Found', 404, null)
-            res.send(apiResponse)
-        } else {
-            let apiResponse = response.generate(false, 'Product Successfully updated', 200, result)
-            res.send(apiResponse)
-        }
+
+    let findBrandName = () => {
+        return new Promise((resolve,reject) => {
+           brandModel.find({'brand_id': req.body.brand_id}).exec((err,result) => {
+               if(err) {
+                  reject('Brand is not found')
+               } else {
+                   brand_name = result[0].name  
+                   resolve('Brand found')             
+                }
+        })
+
     })
+    }
+
+    let updateProduct = () => {
+    return new Promise((resolve,reject) => {     
+        productModel.updateOne({'product_id':req.params.id},option,{multi:true})
+        .exec((err,result) => {
+            if (err) {
+                console.log(err)
+                logger.error(err.message, 'Product Controller: branch', 10)
+                let apiResponse = response.generate(true, 'Failed To update Product', 500, null)
+                res.send(apiResponse)
+            } else if (check.isEmpty(result)) {
+                logger.info('No Product Found', 'Product Controller: Product')
+                let apiResponse = response.generate(true, 'No Detail Found', 404, null)
+                res.send(apiResponse)
+            } else {
+                let apiResponse = response.generate(false, 'Product Successfully updated', 200, result)
+                res.send(apiResponse)
+            }
+        })
+    })  
+   }
+   findBrandName(req,res)
+   .then(updateProduct)
+   .then((resolve) => {
+      let apiResponse = response.generate(false, 'Product Updated Successfully', 200, resolve)
+      res.status(200)
+      res.send(apiResponse)
+     }).catch((err) => {
+      console.log("errorhandler");
+      console.log(err);
+      res.status(err.status)
+      res.send(err)
+  })
 }
 
 
