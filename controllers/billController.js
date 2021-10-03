@@ -114,6 +114,7 @@ let getAllBill = (req, res) => {
                 })
         }
     } else {
+        console.log('inside else')
         getEmployeeSales(req,res)
     }
 
@@ -121,6 +122,7 @@ let getAllBill = (req, res) => {
 }
 
  function getEmployeeSales(req, res){
+     console.log('here inside employee sales')
     let employeeSalesList = [];
     const page = req.query.current_page
     const limit = req.query.per_page
