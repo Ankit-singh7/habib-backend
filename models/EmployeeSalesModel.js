@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-let billSchema = new Schema(
+let EmployeeSalesSchema = new Schema(
     {
 
         bill_id:{
@@ -9,14 +9,6 @@ let billSchema = new Schema(
             default: '',
             index: true,
             unique: true
-        },
-        user_name: {
-          type:String,
-          default:''
-        },
-        user_id: {
-            type:String,
-            default:''
         },
         customer_name: {
             type:String,
@@ -38,6 +30,14 @@ let billSchema = new Schema(
             type:String,
             default:''
         },
+        employee_name:{
+            type:String,
+            default:''
+        },
+        employee_id:{
+            type:String,
+            default:'' 
+        },
         branch_id:{
             type:String,
             default:''
@@ -47,18 +47,6 @@ let billSchema = new Schema(
             default:''
         },
         total_price: {
-            type: Number,
-            default:null
-        },
-        booking_amount:{
-            type: Number,
-            default:null
-        },
-        amount_to_be_paid:{
-            type: Number,
-            default:null
-        },
-        service_amount: {
             type: Number,
             default:null
         },
@@ -76,14 +64,6 @@ let billSchema = new Schema(
                    type:Number,
                    default:null
                },
-               employee_id:{
-                type:String,
-                default:''
-              },
-              employee_name:{
-                type:String,
-                default:''
-              },
               total:{
                 type:Number,
                 default:null
@@ -104,14 +84,6 @@ let billSchema = new Schema(
                     type:Number,
                     default:null
                 },
-                employee_id:{
-                    type:String,
-                    default:''
-                },
-                employee_name:{
-                    type:String,
-                    default:''
-                },
                 total:{
                     type:Number,
                     default:null
@@ -129,4 +101,4 @@ let billSchema = new Schema(
     }
 )
 
-mongoose.model('bill', billSchema);
+mongoose.model('employeeSales', EmployeeSalesSchema);

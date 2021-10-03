@@ -14,6 +14,7 @@ const sessionModel = mongoose.model('session');
 const productSalesReportModel = mongoose.model('productSalesReport')
 const serviceSalesReportModel = mongoose.model('serviceSalesReport')
 const appointmentModel = mongoose.model('appointment');
+const employeeSalesModel = mongoose.model('employeeSales');
 
 let getAllBill = (req, res) => {
     const page = req.query.current_page
@@ -26,6 +27,115 @@ let getAllBill = (req, res) => {
     delete filters.startDate
     delete filters.endDate
     console.log('filter', filters)
+
+    if(!req.query.employee_id) {
+        
+        if(startDate && endDate) {
+             console.log('here')
+             console.log('billStart',startDate)
+             console.log('billEnd', endDate)
+            billModel.find({'date':{ $gte:startDate, $lte:endDate}}).sort({ _id: -1 })
+                .lean()
+                .exec((err, result) => {
+                    if (err) {
+                        console.log(err)
+                        logger.error(err.message, 'Bill Controller: getAllBill', 10)
+                        let apiResponse = response.generate(true, 'Failed To Find Food Sub-Category Details', 500, null)
+                        res.send(apiResponse)
+                    } else if (check.isEmpty(result)) {
+                        logger.info('No Data Found', 'Bill Controller: getAllBill')
+                        let apiResponse = response.generate(true, 'No Data Found', 404, null)
+                        res.send(apiResponse)
+                    } else {
+                        const filteredUsers = result.filter(user => {
+                            console.log('here', user)
+                            let isValid = true;
+                            for (key in filters) {
+                                console.log(filters[key])
+                                console.log('here', user[key])
+                                if (key === 'createdOn') {
+        
+                                    isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
+                                } else {
+                                    isValid = isValid && user[key] == filters[key];
+                                }
+        
+                            }
+                            return isValid;
+                        });
+                        const startIndex = (page - 1) * limit;
+                        const endIndex = page * limit
+                        let total = result.length;
+                        let billList = filteredUsers.slice(startIndex, endIndex)
+                        let newResult = { total: total, result: billList }
+                        let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
+                        res.send(apiResponse)
+                    }
+                })
+        } else {
+          console.log('no date')
+            billModel.find().sort({ _id: -1 })
+                .lean()
+                .exec((err, result) => {
+                    if (err) {
+                        console.log(err)
+                        logger.error(err.message, 'Bill Controller: getAllBill', 10)
+                        let apiResponse = response.generate(true, 'Failed To Find Food Sub-Category Details', 500, null)
+                        res.send(apiResponse)
+                    } else if (check.isEmpty(result)) {
+                        logger.info('No Data Found', 'Bill Controller: getAllBill')
+                        let apiResponse = response.generate(true, 'No Data Found', 404, null)
+                        res.send(apiResponse)
+                    } else {
+                        const filteredUsers = result.filter(user => {
+                            console.log('here', user)
+                            let isValid = true;
+                            for (key in filters) {
+                                console.log(filters[key])
+                                console.log('here', user[key])
+                                if (key === 'createdOn') {
+        
+                                    isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
+                                } else {
+                                    isValid = isValid && user[key] == filters[key];
+                                }
+        
+                            }
+                            return isValid;
+                        });
+                        const startIndex = (page - 1) * limit;
+                        const endIndex = page * limit
+                        let total = result.length;
+                        let billList = filteredUsers.slice(startIndex, endIndex)
+                        let newResult = { total: total, result: billList }
+                        let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
+                        res.send(apiResponse)
+                    }
+                })
+        }
+    } else {
+        getEmployeeSales(req,res)
+    }
+
+
+}
+
+ function getEmployeeSales(req, res){
+    let employeeSalesList = [];
+    const page = req.query.current_page
+    const limit = req.query.per_page
+    const startDate = req.query.startDate
+    const endDate = req.query.endDate
+    const employee_id = req.query.employee_id
+    const filters = req.query;
+    delete filters.current_page
+    delete filters.employee_id
+    delete filters.per_page
+    delete filters.startDate
+    delete filters.endDate
+    console.log('filter', filters)
+
+
 
     if(startDate && endDate) {
          console.log('here')
@@ -64,6 +174,28 @@ let getAllBill = (req, res) => {
                     const endIndex = page * limit
                     let total = result.length;
                     let billList = filteredUsers.slice(startIndex, endIndex)
+                    for(let item of billList) {
+                        let products = [];
+                        let services = [];
+                        for(let product of item.products) {
+                            if(product.employee_id === employee_id) {
+                                 products.push(product)
+                            }
+                        }
+                        for(let service of item.services) {
+                            if(service.employee_id === employee_id) {
+                                services.push(service)
+                            }
+                        }
+                        delete item.products
+                        delete item.services
+                        item.employee_id = employee_id
+                        item.products = products
+                        item.services = services
+                        employeeSalesList.push(item)
+                        
+                    }
+
                     let newResult = { total: total, result: billList }
                     let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
                     res.send(apiResponse)
@@ -104,6 +236,27 @@ let getAllBill = (req, res) => {
                     const endIndex = page * limit
                     let total = result.length;
                     let billList = filteredUsers.slice(startIndex, endIndex)
+                    for(let item of billList) {
+                        let products = [];
+                        let services = [];
+                        for(let product of item.products) {
+                            if(product.employee_id === employee_id) {
+                                 products.push(product)
+                            }
+                        }
+                        for(let service of item.services) {
+                            if(service.employee_id === employee_id) {
+                                services.push(service)
+                            }
+                        }
+                        delete item.products
+                        delete item.services
+                        item.employee_id = employee_id
+                        item.products = products
+                        item.services = services
+                        employeeSalesList.push(item)
+                        
+                    }
                     let newResult = { total: total, result: billList }
                     let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
                     res.send(apiResponse)
@@ -112,6 +265,7 @@ let getAllBill = (req, res) => {
     }
 
 }
+
 
 
 
@@ -152,6 +306,7 @@ let createBill = (req, res) => {
         payment_mode: req.body.payment_mode,
         total_price: req.body.total_price,
         booking_amount: req.body.booking_amount,
+        amount_to_be_paid: req.body.amount_to_be_paid,
         products: req.body.products,
         services: req.body.services,
         branch_id: req.body.branch_id,
@@ -169,6 +324,7 @@ let createBill = (req, res) => {
             let apiResponse = response.generate(true, 'Failed To create new Bill', 500, null)
             res.send(apiResponse)
         } else {
+
             if(req.body.appointment_id){
                 appointmentModel.deleteMany({'appointment_id': req.body.appointment_id}).exec((err,result) => {
                     if(err){
