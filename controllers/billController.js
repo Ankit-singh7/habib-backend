@@ -177,26 +177,32 @@ let getAllBill = (req, res) => {
                     for(let item of billList) {
                         let products = [];
                         let services = [];
+                        let total = 0;
                         for(let product of item.products) {
                             if(product.employee_id === employee_id) {
+                                total = total + product.total
                                  products.push(product)
                             }
                         }
                         for(let service of item.services) {
                             if(service.employee_id === employee_id) {
+                                total = total + service.total
                                 services.push(service)
                             }
                         }
                         delete item.products
                         delete item.services
+                        delete item.booking_amount
+                        delete item.amount_to_be_paid
                         item.employee_id = employee_id
                         item.products = products
                         item.services = services
+                        item.total_price = total
                         employeeSalesList.push(item)
                         
                     }
 
-                    let newResult = { total: total, result: billList }
+                    let newResult = { total: total, result: employeeSalesList }
                     let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
                     res.send(apiResponse)
                 }
@@ -239,25 +245,32 @@ let getAllBill = (req, res) => {
                     for(let item of billList) {
                         let products = [];
                         let services = [];
+                        let total = 0;
                         for(let product of item.products) {
                             if(product.employee_id === employee_id) {
+                                total = total + product.total
                                  products.push(product)
                             }
                         }
                         for(let service of item.services) {
                             if(service.employee_id === employee_id) {
+                                total = total + service.total
                                 services.push(service)
                             }
                         }
                         delete item.products
                         delete item.services
+                        delete item.booking_amount
+                        delete item.amount_to_be_paid
                         item.employee_id = employee_id
                         item.products = products
                         item.services = services
+                        item.total_price = total
                         employeeSalesList.push(item)
                         
                     }
-                    let newResult = { total: total, result: billList }
+
+                    let newResult = { total: total, result: employeeSalesList }
                     let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
                     res.send(apiResponse)
                 }
