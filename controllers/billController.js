@@ -255,7 +255,9 @@ let getAllBill = (req, res) => {
                         let services = [];
                         let total = 0;
                         let productsArr = JSON.parse(JSON.stringify(item.products));
+                        console.log('productsArr',productsArr)
                         let servicesArr = JSON.parse(JSON.stringify(item.services));
+                        console.log('servicesArr', servicesArr)
                         for(let product of productsArr) {
                             if(product.employee_id === employee_id) {
                                 total = total + product.total
@@ -281,6 +283,7 @@ let getAllBill = (req, res) => {
                     }
                     
                     let newResult = { total: total, result: employeeSalesList }
+                    console.log('employeeList',employeeSalesList)
                     let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
                     res.send(apiResponse)
                 }
