@@ -68,6 +68,7 @@ let getAllBill = (req, res) => {
                         let total = result.length;
                         let billList = filteredUsers.slice(startIndex, endIndex)
                         let newResult = { total: total, result: billList }
+                        console.log('billListAll', billList)
                         let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
                         res.send(apiResponse)
                     }
