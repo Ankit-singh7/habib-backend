@@ -182,13 +182,16 @@ let getAllBill = (req, res) => {
                         let products = [];
                         let services = [];
                         let total = 0;
-                        for(let product of item.products) {
+                        let productsArr = JSON.parse(JSON.stringify(item.products));
+                        let servicesArr = JSON.parse(JSON.stringify(item.services));
+
+                        for(let product of productsArr) {
                             if(product.employee_id === employee_id) {
                                 total = total + product.total
                                  products.push(product)
                             }
                         }
-                        for(let service of item.services) {
+                        for(let service of servicesArr) {
                             if(service.employee_id === employee_id) {
                                 total = total + service.total
                                 services.push(service)
@@ -251,13 +254,15 @@ let getAllBill = (req, res) => {
                         let products = [];
                         let services = [];
                         let total = 0;
-                        for(let product of item.products) {
+                        let productsArr = JSON.parse(JSON.stringify(item.products));
+                        let servicesArr = JSON.parse(JSON.stringify(item.services));
+                        for(let product of productsArr) {
                             if(product.employee_id === employee_id) {
                                 total = total + product.total
                                  products.push(product)
                             }
                         }
-                        for(let service of item.services) {
+                        for(let service of servicesArr) {
                             if(service.employee_id === employee_id) {
                                 total = total + service.total
                                 services.push(service)
