@@ -224,6 +224,7 @@ let getAllBill = (req, res) => {
                     let apiResponse = response.generate(true, 'No Data Found', 404, null)
                     res.send(apiResponse)
                 } else {
+                    console.log('result',result)
                     const filteredUsers = result.filter(user => {
                         let isValid = true;
                         for (key in filters) {
