@@ -225,11 +225,9 @@ let getAllBill = (req, res) => {
                     res.send(apiResponse)
                 } else {
                     const filteredUsers = result.filter(user => {
-                        console.log('here', user)
                         let isValid = true;
                         for (key in filters) {
                             console.log(filters[key])
-                            console.log('here', user[key])
                             if (key === 'createdOn') {
     
                                 isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
@@ -240,10 +238,12 @@ let getAllBill = (req, res) => {
                         }
                         return isValid;
                     });
+                    console.log('filteredUser',filteredUsers)
                     const startIndex = (page - 1) * limit;
                     const endIndex = page * limit
                     let total = result.length;
                     let billList = filteredUsers.slice(startIndex, endIndex)
+                    console.log('billList',billList)
                     for(let item of billList) {
                         let products = [];
                         let services = [];
@@ -271,7 +271,7 @@ let getAllBill = (req, res) => {
                         employeeSalesList.push(item)
                         
                     }
-
+                    
                     let newResult = { total: total, result: employeeSalesList }
                     let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
                     res.send(apiResponse)
