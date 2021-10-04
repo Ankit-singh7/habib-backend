@@ -174,10 +174,11 @@ let getAllBill = (req, res) => {
                         }
                         return isValid;
                     });
-                    const startIndex = (page - 1) * limit;
-                    const endIndex = page * limit
+                    // const startIndex = (page - 1) * limit;
+                    // const endIndex = page * limit
                     let total = result.length;
-                    let billList = filteredUsers.slice(startIndex, endIndex)
+                    // let billList = filteredUsers.slice(startIndex, endIndex)
+                    let billList = filteredUsers
                     for(let item of billList) {
                         let products = [];
                         let services = [];
