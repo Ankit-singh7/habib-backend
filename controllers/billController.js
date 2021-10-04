@@ -89,7 +89,7 @@ let getAllBill = (req, res) => {
                         res.send(apiResponse)
                     } else {
                         const filteredUsers = result.filter(user => {
-                            console.log('here', user)
+                            // console.log('here', user)
                             let isValid = true;
                             for (key in filters) {
                                 console.log(filters[key])
@@ -109,6 +109,7 @@ let getAllBill = (req, res) => {
                         let total = result.length;
                         let billList = filteredUsers.slice(startIndex, endIndex)
                         let newResult = { total: total, result: billList }
+                        console.log('billListAll', billList)
                         let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
                         res.send(apiResponse)
                     }
