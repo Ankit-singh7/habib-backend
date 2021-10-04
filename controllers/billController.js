@@ -248,8 +248,12 @@ let getAllBill = (req, res) => {
                     console.log('filteredUser',filteredUsers)
                     const startIndex = (page - 1) * limit;
                     const endIndex = page * limit
+                
+          // const startIndex = (page - 1) * limit;
+                    // const endIndex = page * limit
                     let total = result.length;
-                    let billList = filteredUsers.slice(startIndex, endIndex)
+                    // let billList = filteredUsers.slice(startIndex, endIndex)
+                    let billList = filteredUsers
                     console.log('billList',billList)
                     for(let item of billList) {
                         let products = [];
