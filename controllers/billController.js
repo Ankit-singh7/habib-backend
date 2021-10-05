@@ -117,13 +117,13 @@ let getAllBill = (req, res) => {
         }
     } else {
         console.log('inside else')
-        getEmployeeSales(req,res,sd,ed)
+        getEmployeeSales(req,res,startDate,endDate)
     }
 
 
 }
 
- function getEmployeeSales(req, res){
+ function getEmployeeSales(req, res,sd,ed){
      console.log('here inside employee sales')
     let employeeSalesList = [];
     const page = req.query.current_page
