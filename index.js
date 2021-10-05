@@ -55,6 +55,7 @@ cron.schedule('00 */1 * * * *', function() {
     }else if (check.isEmpty(result)) {
       console.log('No active session')
     } else {
+      console.log(result)
       for (let item of result) {
         
         let option = {
