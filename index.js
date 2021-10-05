@@ -18,8 +18,8 @@ const libs = require('./libs/timeLib');
 app.use(cors());
 const time = require('./libs/timeLib');
 const check = require('./libs/checkLib')
-// const model = require('./models/SessionModel')
 const sessionModel = mongoose.model('session')
+// const model = require('./models/SessionModel')
 const multer = require('multer');
 const storage = multer.diskStorage({
   destination: function(req,file,cb) {
