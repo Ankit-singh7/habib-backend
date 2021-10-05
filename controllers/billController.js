@@ -24,6 +24,8 @@ let getAllBill = (req, res) => {
     const filters = req.query;
     delete filters.current_page
     delete filters.per_page
+    delete filters.startDate
+    delete filters.endDate
     console.log('filter', filters)
 
     if(!req.query.employee_id) {
@@ -115,7 +117,7 @@ let getAllBill = (req, res) => {
         }
     } else {
         console.log('inside else')
-        getEmployeeSales(req,res)
+        getEmployeeSales(req,res,sd,ed)
     }
 
 
@@ -126,8 +128,8 @@ let getAllBill = (req, res) => {
     let employeeSalesList = [];
     const page = req.query.current_page
     const limit = req.query.per_page
-    const startDate = req.query.startDate
-    const endDate = req.query.endDate
+    const startDate = sd?sd:''
+    const endDate = ed?ed:''
     const employee_id = req.query.employee_id
     const filters = req.query;
     delete filters.current_page
