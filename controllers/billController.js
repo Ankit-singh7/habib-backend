@@ -135,8 +135,6 @@ let getAllBill = (req, res) => {
     delete filters.current_page
     delete filters.employee_id
     delete filters.per_page
-    delete filters.startDate
-    delete filters.endDate
     console.log('filter', filters)
 
 
