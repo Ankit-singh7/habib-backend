@@ -24,12 +24,26 @@ let getAllSalesReport = (req, res) => {
                 res.send(apiResponse)
     
             } else {
-                // const startIndex = (page - 1)*limit;
-                // const endIndex = page * limit
-                // let total = result.length;
-                // let reportList = result.slice(startIndex,endIndex)
-                // let newResult = {total:total,result:reportList}
-                let apiResponse = response.generate(false, 'All Bills Found', 200, result)
+                const filteredUsers = result.filter(user => {
+                    console.log('here', user)
+                    let isValid = true;
+                    for (key in filters) {
+                        console.log(filters[key])
+                        console.log('here', user[key])
+                        if (key === 'createdOn') {
+
+                            isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
+                        } else {
+                            isValid = isValid && user[key] == filters[key];
+                        }
+
+                    }
+                    return isValid;
+                });
+                let total = filteredUsers.length;
+                let reportList = filteredUsers
+                let newResult = {total:total,result:reportList}
+                let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
                 res.send(apiResponse)
 
             }
@@ -50,12 +64,26 @@ let getAllSalesReport = (req, res) => {
                     let apiResponse = response.generate(true, 'No Data Found', 404, null)
                     res.send(apiResponse)
                 } else {
-                    // const startIndex = (page - 1)*limit;
-                    // const endIndex = page * limit
-                    // let total = result.length;
-                    // let reportList = result.slice(startIndex,endIndex)
-                    // let newResult = {total:total,result:reportList}
-                    let apiResponse = response.generate(false, 'All Sales Report Found', 200, result)
+                    const filteredUsers = result.filter(user => {
+                        console.log('here', user)
+                        let isValid = true;
+                        for (key in filters) {
+                            console.log(filters[key])
+                            console.log('here', user[key])
+                            if (key === 'createdOn') {
+    
+                                isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
+                            } else {
+                                isValid = isValid && user[key] == filters[key];
+                            }
+    
+                        }
+                        return isValid;
+                    });
+                    let total = filteredUsers.length;
+                    let reportList = filteredUsers
+                    let newResult = {total:total,result:reportList}
+                    let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
                     res.send(apiResponse)
                 }
             })
