@@ -30,12 +30,8 @@ let getAllSalesReport = (req, res) => {
                     for (key in filters) {
                         console.log(filters[key])
                         console.log('here', user[key])
-                        if (key === 'createdOn') {
-
-                            isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
-                        } else {
                             isValid = isValid && user[key] == filters[key];
-                        }
+                        
 
                     }
                     return isValid;
@@ -70,12 +66,8 @@ let getAllSalesReport = (req, res) => {
                         for (key in filters) {
                             console.log(filters[key])
                             console.log('here', user[key])
-                            if (key === 'createdOn') {
-    
-                                isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
-                            } else {
                                 isValid = isValid && user[key] == filters[key];
-                            }
+                            
     
                         }
                         return isValid;
