@@ -11,9 +11,16 @@ const appointmentModel = mongoose.model('appointment');
 let getAllAppointment = (req,res) => {
     const page = req.query.current_page
     const limit = req.query.per_page
+    const startDate = req.query.startDate
+    const endDate = req.query.endDate
     const filters = req.query;
     delete filters.current_page
     delete filters.per_page
+    delete filters.startDate
+    delete filters.endDate
+    if(startDate && endDate) {
+        
+    }
     appointmentModel.find().sort({ _id: -1 })
     .lean()
     .exec((err,result) => {

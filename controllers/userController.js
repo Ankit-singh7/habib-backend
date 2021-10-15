@@ -71,6 +71,9 @@ let getAllOperator = (req,res) => {
                 const endIndex = page * limit
                 let total = result.length;
                 let empList = result.slice(startIndex,endIndex)
+                let sortResult = result.sort(function(a,b) {
+                    return a.f_name.localeCompare(b.f_name); //using String.prototype.localCompare()
+                })
                 let newResult = {total:total,result:empList}
                 let apiResponse = response.generate(false, 'All User Details Found', 200, newResult)
                 res.send(apiResponse)
