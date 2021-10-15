@@ -74,7 +74,7 @@ let getAllOperator = (req,res) => {
                 let sortResult = result.sort(function(a,b) {
                     return a.f_name.localeCompare(b.f_name); //using String.prototype.localCompare()
                 })
-                let newResult = {total:total,result:empList}
+                let newResult = {total:total,result:sortResult}
                 let apiResponse = response.generate(false, 'All User Details Found', 200, newResult)
                 res.send(apiResponse)
             }
