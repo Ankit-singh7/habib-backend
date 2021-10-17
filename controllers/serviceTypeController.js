@@ -23,7 +23,10 @@ let getAllService = (req,res) => {
             let apiResponse = response.generate(true, 'No Data Found', 404, null)
             res.send(apiResponse)
         }  else {
-            let apiResponse = response.generate(false, 'All Branch Found', 200, result)
+            let sortResult = empList.sort(function(a,b) {
+                return a.name.localeCompare(b.name); //using String.prototype.localCompare()
+            })
+            let apiResponse = response.generate(false, 'All Product Found', 200, sortResult)
             res.send(apiResponse)
         }
     })

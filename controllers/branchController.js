@@ -23,7 +23,10 @@ let getAllBranch = (req,res) => {
             let apiResponse = response.generate(true, 'No Data Found', 404, null)
             res.send(apiResponse)
         }  else {
-            let apiResponse = response.generate(false, 'All Branch Found', 200, result)
+            let sortResult = empList.sort(function(a,b) {
+                return a.branch_name.localeCompare(b.branch_name); //using String.prototype.localCompare()
+            })
+            let apiResponse = response.generate(false, 'All Branch Found', 200, sortResult)
             res.send(apiResponse)
         }
     })

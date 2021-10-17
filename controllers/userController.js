@@ -41,7 +41,10 @@ let getAllEmployee = (req,res) => {
                 const endIndex = page * limit
                 let total = result.length;
                 let empList = result.slice(startIndex,endIndex)
-                let newResult = {total:total,result:empList}
+                let sortResult = empList.sort(function(a,b) {
+                    return a.f_name.localeCompare(b.f_name); //using String.prototype.localCompare()
+                })
+                let newResult = {total:total,result:sortResult}
                 let apiResponse = response.generate(false, 'All User Details Found', 200, newResult)
                 res.send(apiResponse)
             }
@@ -71,7 +74,7 @@ let getAllOperator = (req,res) => {
                 const endIndex = page * limit
                 let total = result.length;
                 let empList = result.slice(startIndex,endIndex)
-                let sortResult = result.sort(function(a,b) {
+                let sortResult = empList.sort(function(a,b) {
                     return a.f_name.localeCompare(b.f_name); //using String.prototype.localCompare()
                 })
                 let newResult = {total:total,result:sortResult}
@@ -134,8 +137,10 @@ let getAllAdmin = (req,res) => {
                 const startIndex = (page - 1)*limit;
                 const endIndex = page * limit
                 let total = result.length;
-                let empList = result.slice(startIndex,endIndex)
-                let newResult = {total:total,result:empList}
+                let sortResult = empList.sort(function(a,b) {
+                    return a.f_name.localeCompare(b.f_name); //using String.prototype.localCompare()
+                })
+                let newResult = {total:total,result:sortResult}
                 let apiResponse = response.generate(false, 'All User Details Found', 200, newResult)
                 res.send(apiResponse)
             }
