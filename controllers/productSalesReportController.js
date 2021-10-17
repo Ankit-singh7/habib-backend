@@ -41,10 +41,12 @@ let getAllSalesReport = (req, res) => {
                 });
                 let total = filteredUsers.length;
                 let reportList = filteredUsers
-                let newResult = {total:total,result:reportList}
-                let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
+                let sortResult = reportList.sort(function(a,b) {
+                    return a.product_name.localeCompare(b.product_name);//using String.prototype.localCompare()
+                })
+                let newResult = {total:total,result:sortResult}
+                let apiResponse = response.generate(false, 'All sales Found', 200, newResult)
                 res.send(apiResponse)
-
             }
         })
     } 
