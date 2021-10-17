@@ -47,8 +47,8 @@ app.use('/uploads',express.static('uploads'))
 app.use(express.static(path.join(__dirname, 'client')));
 
 
-cron.schedule('25 1 * * * *', function() {
-  console.log('running a task');
+cron.schedule('* * * * * *', function() {
+  console.log(time.now());
   sessionModel.find({session_status:'true'}).exec((err,result) => {
     if(err) {
       console.log(err)
