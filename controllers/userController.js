@@ -23,6 +23,9 @@ const applicationUrl = 'http://trego.tk' //url of frontend application
 let getAllEmployee = (req,res) => {
     const page = req.query.current_page?req.query.current_page: 1
     const limit = req.query.per_page?req.query.per_page:1000
+    const filters = req.query;
+    delete filters.current_page
+    delete filters.per_page
     UserModel.find({'role': 'employee'})
         .select(' -__v -_id')
         .lean()
@@ -37,10 +40,27 @@ let getAllEmployee = (req,res) => {
                 let apiResponse = response.generate(true, 'No User Found', 404, null)
                 res.send(apiResponse)
             } else {
+                const filteredUsers = result.filter(user => {
+                    console.log('here', user)
+                    let isValid = true;
+                    for (key in filters) {
+                        console.log(filters[key])
+                        console.log('here', user[key])
+                        if (key === 'createdOn') {
+
+                            isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
+                        } else {
+                            isValid = isValid && user[key] == filters[key];
+                        }
+
+                    }
+                    return isValid;
+                });
                 const startIndex = (page - 1)*limit;
                 const endIndex = page * limit
                 let total = result.length;
-                let empList = result.slice(startIndex,endIndex)
+                let empList = filteredUsers.slice(startIndex, endIndex)
+                // let empList = result.slice(startIndex,endIndex)
                 let sortResult = empList.sort(function(a,b) {
                     return a.f_name.localeCompare(b.f_name); //using String.prototype.localCompare()
                 })
@@ -56,6 +76,9 @@ let getAllEmployee = (req,res) => {
 let getAllOperator = (req,res) => {
     const page = req.query.current_page
     const limit = req.query.per_page
+    const filters = req.query;
+    delete filters.current_page
+    delete filters.per_page
     UserModel.find({'role': 'operator'})
         .select(' -__v -_id')
         .lean()
@@ -70,10 +93,26 @@ let getAllOperator = (req,res) => {
                 let apiResponse = response.generate(true, 'No User Found', 404, null)
                 res.send(apiResponse)
             } else {
+                const filteredUsers = result.filter(user => {
+                    console.log('here', user)
+                    let isValid = true;
+                    for (key in filters) {
+                        console.log(filters[key])
+                        console.log('here', user[key])
+                        if (key === 'createdOn') {
+
+                            isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
+                        } else {
+                            isValid = isValid && user[key] == filters[key];
+                        }
+
+                    }
+                    return isValid;
+                });
                 const startIndex = (page - 1)*limit;
                 const endIndex = page * limit
                 let total = result.length;
-                let empList = result.slice(startIndex,endIndex)
+                let empList = filteredUsers.slice(startIndex, endIndex)
                 let sortResult = empList.sort(function(a,b) {
                     return a.f_name.localeCompare(b.f_name); //using String.prototype.localCompare()
                 })
