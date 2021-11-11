@@ -45,6 +45,10 @@ const sessionSchema = new Schema({
     type:Number,
     default: 0
   },
+  date:{
+    type:String,
+    default:''
+  },
   createdOn: {
     type: Date
   }
