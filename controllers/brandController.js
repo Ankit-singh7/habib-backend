@@ -9,6 +9,7 @@ const brandModel = mongoose.model('brand');
 
 
 let getAllBrand = (req,res) => {
+    const filters = req.query;
     brandModel.find()
     .lean()
     .select('-__v -_id')
@@ -23,7 +24,20 @@ let getAllBrand = (req,res) => {
             let apiResponse = response.generate(true, 'No Data Found', 404, null)
             res.send(apiResponse)
         }  else {
-            let sortResult = result.sort(function(a,b) {
+            const filteredUsers = result.filter(user => {
+                console.log('here', user)
+                let isValid = true;
+                for (key in filters) {
+                    console.log(filters[key])
+                    console.log('here', user[key])
+           
+                        isValid = isValid && user[key] == filters[key];
+                    
+
+                }
+                return isValid;
+            });
+            let sortResult = filteredUsers.sort(function(a,b) {
                 return a.name.localeCompare(b.name); //using String.prototype.localCompare()
             })
             let apiResponse = response.generate(false, 'All Brand Found', 200, sortResult)

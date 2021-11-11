@@ -19,4 +19,6 @@ module.exports.setRouter = (app) => {
     app.get(`${baseUrl}/:id/getById`,sessionController.getSessionDetail);
 
     app.get(`${baseUrl}/:branch_id/findCurrentStatus`,sessionController.getCurrentSession)
+
+    app.get(`${baseUrl}/:branch_id/deactivate`,sessionController.deactivateAllSession)
 }

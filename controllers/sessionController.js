@@ -72,6 +72,7 @@ let createSession = (req,res) => {
        branch_id: req.body.branch_id,
        branch_name: req.body.branch_name,
        isWithdrawn: 'false',
+       date: time.getNormalTime(),
        cash_income: req.body.cash_income,
        createdOn: time.now()
     })
@@ -160,7 +161,7 @@ let updateSession = (req,res) => {
 
 let getCurrentSession = (req,res) => {
 
-    sessionModel.findOne({'session_status': 'true','branch_id': req.params.branch_id})
+    sessionModel.findOne({'session_status': 'true','branch_id': req.params.branch_id,'date': time.getNormalTime()})
     .select('-__v -_id')
     .lean()
     .exec((err, result) => {
@@ -181,6 +182,35 @@ let getCurrentSession = (req,res) => {
 }
 
 
+let deactivateAllSession = (req,res) => {
+    sessionModel.find({session_status:'true','branch_id': req.params.branch_id}).exec((err,result) => {
+        if(err) {
+          console.log(err)
+        }else if (check.isEmpty(result)) {
+          console.log('No active session')
+        } else {
+          console.log(result)
+          for (let item of result) {
+            
+            let option = {
+              session_status: 'false'
+            }
+      
+            sessionModel.updateOne({'session_id':item.session_id},option,{multi:true}).exec((err,result) => {
+              if(err) {
+                console.log(err)
+              }else {
+                console.log('updated successfully')
+              }
+            })
+          }
+        }
+      })
+}
+
+
+
+
 
 
 module.exports = {
@@ -189,5 +219,6 @@ module.exports = {
     updateSession: updateSession,
     deleteSession: deleteSession,
     getSessionDetail: getSessionDetail,
-    getCurrentSession: getCurrentSession
+    getCurrentSession: getCurrentSession,
+    deactivateAllSession: deactivateAllSession
 }
