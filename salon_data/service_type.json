@@ -1,0 +1,9 @@
+{"_id":{"$oid":"613522903eae5e001753db4d"},"service_type_id":"9pdLzYvaE","name":"Hair","createdOn":{"$date":"2021-09-05T20:03:28Z"},"__v":0}
+{"_id":{"$oid":"61691c0d62afc70017b3e0fe"},"service_type_id":"061bvlJCc","name":"Clean-up & Facials","createdOn":{"$date":"2021-10-15T06:13:33Z"},"__v":0}
+{"_id":{"$oid":"61691c1462afc70017b3e101"},"service_type_id":"P0T5950co","name":"Makeup","createdOn":{"$date":"2021-10-15T06:13:40Z"},"__v":0}
+{"_id":{"$oid":"61691c2962afc70017b3e104"},"service_type_id":"iIImRMhX0","name":"Others","createdOn":{"$date":"2021-10-15T06:14:01Z"},"__v":0}
+{"_id":{"$oid":"61704faaf783690017020531"},"service_type_id":"xetNXVOwM","name":"Waxing & Threading","createdOn":{"$date":"2021-10-20T17:19:38Z"},"__v":0}
+{"_id":{"$oid":"61704fb1f783690017020534"},"service_type_id":"-kgIEXv04","name":"Colour","createdOn":{"$date":"2021-10-20T17:19:45Z"},"__v":0}
+{"_id":{"$oid":"61704fc0f783690017020537"},"service_type_id":"BT0ebzIxz","name":"Perming","createdOn":{"$date":"2021-10-20T17:20:00Z"},"__v":0}
+{"_id":{"$oid":"61705262f7836900170205a6"},"service_type_id":"UMfxUMlwu","name":"Body Services","createdOn":{"$date":"2021-10-20T17:31:14Z"},"__v":0}
+{"_id":{"$oid":"61705eb3f7836900170207a4"},"service_type_id":"L_0ZHfWzE","name":"Treatments & Spa","createdOn":{"$date":"2021-10-20T18:23:47Z"},"__v":0}

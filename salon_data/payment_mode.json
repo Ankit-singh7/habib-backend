@@ -1,0 +1,7 @@
+{"_id":{"$oid":"61351832de9a060017a239ae"},"payment_mode_id":"YX0nHWR-z","payment_mode_name":"Net Banking","__v":0}
+{"_id":{"$oid":"6135183dde9a060017a239b0"},"payment_mode_id":"v2nAeNfd6","payment_mode_name":"Cash","__v":0}
+{"_id":{"$oid":"6135185ade9a060017a239b2"},"payment_mode_id":"DSmDDS3nt","payment_mode_name":"GPay","__v":0}
+{"_id":{"$oid":"61351865de9a060017a239b4"},"payment_mode_id":"FgGAEPWo8","payment_mode_name":"PhonePe","__v":0}
+{"_id":{"$oid":"6156174ea3434a00172c8827"},"payment_mode_id":"0iO3Y6Azp","payment_mode_name":"Card Paytm SD","__v":0}
+{"_id":{"$oid":"61691d8e62afc70017b3e144"},"payment_mode_id":"7UgZxOZvW","payment_mode_name":"Card Paytm ET","__v":0}
+{"_id":{"$oid":"616ec1aa52941a001742b7f4"},"payment_mode_id":"5CWoefVd3","payment_mode_name":"Card BOI","__v":0}

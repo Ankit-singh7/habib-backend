@@ -1,0 +1,1 @@
+{"_id":{"$oid":"615f68dd610f950017bc66ca"},"appointment_id":"BHA1xkym-","appointment_date":"11-10-2021","appointment_time":"4:00 PM","customer_name":"aswathy","purpose":"haircut","branch_id":"KOhOskJLG","branch_name":"Dunlop Habibb","payment_mode":"Cash","booking_amount":500,"status":"pending","createdOn":{"$date":"2021-10-07T21:38:37Z"},"__v":0}
