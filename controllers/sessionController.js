@@ -60,6 +60,11 @@ let getAllSession = (req,res) => {
 }
 
 
+let ActiveSession = (req,res) => {
+    sessionModel.find({"branch_id": req.query.branchId,"date": req.query.date})
+}
+
+
 let createSession = (req,res) => {
     let id = shortid.generate();
     let newSession = new sessionModel({
@@ -161,7 +166,7 @@ let updateSession = (req,res) => {
 
 let getCurrentSession = (req,res) => {
 
-    sessionModel.findOne({'session_status': 'true','branch_id': req.params.branch_id,'date': time.getNormalTime()})
+    sessionModel.findOne({'session_status': 'true','branch_id': req.query.branch_id,'date': req.query.date})
     .select('-__v -_id')
     .lean()
     .exec((err, result) => {
