@@ -324,15 +324,20 @@ let getBillDetail = (req, res) => {
 
 
 let createBill = (req, res) => {
-    let newBill = new billModel({
+    let newBill;
+    if(req.body.dual_payment_mode === false  || req.body.dual_payment_mode === 'false' ) { 
+
+        newBill = new billModel({
         bill_id: req.body.bill_id,
+        token_id: req.body.token_id,
         user_name: req.body.user_name,
         user_id: req.body.user_id,
         customer_name: req.body.customer_name,
         customer_phone: req.body.customer_phone,
         customer_alternative_phone: req.body.customer_alternative_phone,
         customer_address: req.body.customer_address,
-        payment_mode: req.body.payment_mode,
+        payment_mode: req.body.payment_mode_1,
+        dual_payment_mode: req.body.dual_payment_mode,
         total_price: req.body.total_price,
         booking_amount: req.body.booking_amount,
         amount_to_be_paid: req.body.amount_to_be_paid,
@@ -343,6 +348,32 @@ let createBill = (req, res) => {
         date: time.getNormalTime(),
         createdOn: time.now()
     })
+    } else if(req.body.dual_payment_mode === true  || req.body.dual_payment_mode === 'true' ){ 
+        newBill = new billModel({
+            bill_id: req.body.bill_id,
+            token_id: req.body.token_id,
+            user_name: req.body.user_name,
+            user_id: req.body.user_id,
+            customer_name: req.body.customer_name,
+            customer_phone: req.body.customer_phone,
+            customer_alternative_phone: req.body.customer_alternative_phone,
+            customer_address: req.body.customer_address,
+            payment_mode: req.body.payment_mode_1,
+            payment_mode_2: req.body.payment_mode_2,
+            split_amount_1: req.body.split_amount_1,
+            split_amount_2: req.body.split_amount_2,
+            dual_payment_mode: req.body.dual_payment_mode,
+            total_price: req.body.total_price,
+            booking_amount: req.body.booking_amount,
+            amount_to_be_paid: req.body.amount_to_be_paid,
+            products: req.body.products,
+            services: req.body.services,
+            branch_id: req.body.branch_id,
+            branch_name: req.body.branch_name,
+            date: time.getNormalTime(),
+            createdOn: time.now()
+        })
+    }
 
 
 

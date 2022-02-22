@@ -10,6 +10,10 @@ let billSchema = new Schema(
             index: true,
             unique: true
         },
+        token_id:{
+            type:String,
+            default:'' 
+        },
         user_name: {
           type:String,
           default:''
@@ -34,9 +38,25 @@ let billSchema = new Schema(
             type: String,
             default:''
         },
+        dual_payment_mode:{
+            type:String,
+            default:''
+        },
         payment_mode: {
             type:String,
             default:''
+        },
+        payment_mode_2: {
+            type:String,
+            default:''
+        },
+        split_amount_1:{
+            type:Number,
+            default:null
+        },
+        split_amount_2:{
+            type:Number,
+            default:null
         },
         branch_id:{
             type:String,
