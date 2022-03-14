@@ -127,7 +127,6 @@ let getAllBill = (req, res) => {
                         let total = `${total_sales}-${total_bill_count}`;
                         const startIndex = (page - 1) * limit;
                         const endIndex = page * limit
-                        let total = result.length;
                         let billList = filteredUsers.slice(startIndex, endIndex)
                         let newResult = { total: total, result: billList }
                         console.log('billListAll', billList)
