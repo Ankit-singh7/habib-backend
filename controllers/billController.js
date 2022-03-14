@@ -17,6 +17,8 @@ const appointmentModel = mongoose.model('appointment');
 const employeeSalesModel = mongoose.model('employeeSales');
 
 let getAllBill = (req, res) => {
+    let total_sales = 0
+    let total_bill_count = 0
     const page = req.query.current_page
     const limit = req.query.per_page
     const startDate = req.query.startDate
@@ -63,9 +65,18 @@ let getAllBill = (req, res) => {
                             }
                             return isValid;
                         });
+                        if(filteredUsers.length>0) {
+                            for(let item of filteredUsers) {
+                                total_sales = total_sales + item.total_price
+                            }
+    
+                          } else {
+                                total_sales = 0;
+                          }
+                        total_bill_count = filteredUsers.length
                         const startIndex = (page - 1) * limit;
                         const endIndex = page * limit
-                        let total = result.length;
+                        let total = `${total_sales}-${total_bill_count}`;
                         let billList = filteredUsers.slice(startIndex, endIndex)
                         let newResult = { total: total, result: billList }
                         console.log('billListAll', billList)
@@ -104,6 +115,16 @@ let getAllBill = (req, res) => {
                             }
                             return isValid;
                         });
+                        if(filteredUsers.length>0) {
+                            for(let item of filteredUsers) {
+                                total_sales = total_sales + item.total_price
+                            }
+    
+                          } else {
+                                total_sales = 0;
+                          }
+                        total_bill_count = filteredUsers.length
+                        let total = `${total_sales}-${total_bill_count}`;
                         const startIndex = (page - 1) * limit;
                         const endIndex = page * limit
                         let total = result.length;
@@ -384,6 +405,88 @@ let createBill = (req, res) => {
             let apiResponse = response.generate(true, 'Failed To create new Bill', 500, null)
             res.send(apiResponse)
         } else {
+
+            if(req.body.dual_payment_mode === false  || req.body.dual_payment_mode === 'false' ) {
+
+                if(req.body.payment_mode_1 === 'Cash') {
+                    console.log('mode is cash')
+                    sessionModel.findOne({'session_status': 'true'})
+                    .select('-__v -_id')
+                    .lean()
+                    .exec((err, result) => {
+                        if (err) {
+                             console.log(err)
+                             logger.error(err.message, 'Session Controller: getSingleSessionDetail', 10)
+                             let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
+                             console.log(apiResponse);
+                        } else if (check.isEmpty(result)) {
+                             logger.info('No User Found', 'Session Controller: getSingleSessionDetail')
+                             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
+                             console.log(apiResponse);
+                        } else {
+                           console.log(result)
+                           let option = {
+                               drawer_balance: Number(result.drawer_balance) + Number(req.body.total_price)
+                           }
+                           sessionModel.updateOne({session_id: result.session_id},option,{multi:true}).exec((err,result) => {
+                               if(err){
+                                   console.log(err)
+                               } else {
+                                   console.log(result)
+                               }
+                           })
+                        
+                        }
+                     })
+                }
+            } else if(req.body.dual_payment_mode === true  || req.body.dual_payment_mode === 'true' ){
+
+                    console.log('dual payment mode')
+                    if(req.body.payment_mode_1 === 'Cash' || req.body.payment_mode_2 === 'Cash') {
+
+                        sessionModel.findOne({'session_status': 'true'})
+                        .select('-__v -_id')
+                        .lean()
+                        .exec((err, result) => {
+                            if (err) {
+                                 console.log(err)
+                                 logger.error(err.message, 'Session Controller: getSingleSessionDetail', 10)
+                                 let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
+                                 console.log(apiResponse);
+                            } else if (check.isEmpty(result)) {
+                                 logger.info('No User Found', 'Session Controller: getSingleSessionDetail')
+                                 let apiResponse = response.generate(true, 'No Detail Found', 404, null)
+                                 console.log(apiResponse);
+                            } else {
+                               console.log(result)
+                               let option;
+                               if(req.body.payment_mode_1 === 'Cash' && req.body.payment_mode_2 !== 'Cash') {
+                                   option = {
+                                       drawer_balance: Number(result.drawer_balance) + Number(req.body.split_amount_1)
+                                   }
+                                   
+                               } else if(req.body.payment_mode_1 !== 'Cash' && req.body.payment_mode_2 === 'Cash') {
+                                option = {
+                                    drawer_balance: Number(result.drawer_balance) + Number(req.body.split_amount_2)
+                                }
+                               } else if(req.body.payment_mode_1 === 'Cash' && req.body.payment_mode_2 === 'Cash') {
+                                option = {
+                                    drawer_balance: Number(result.drawer_balance) + Number(req.body.total_price)
+                                }
+                               }
+                               sessionModel.updateOne({session_id: result.session_id},option,{multi:true}).exec((err,result) => {
+                                   if(err){
+                                       console.log(err)
+                                   } else {
+                                       console.log(result)
+                                   }
+                               })
+                            
+                            }
+                         })
+                    }
+                
+            }
 
             if(req.body.appointment_id){
                 appointmentModel.deleteMany({'appointment_id': req.body.appointment_id}).exec((err,result) => {
