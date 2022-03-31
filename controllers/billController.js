@@ -33,10 +33,12 @@ let getAllBill = (req, res) => {
     if(!req.query.employee_id) {
         
         if(startDate && endDate) {
+            let formatted_sd = moment(startDate,'DD-MM-YYYY')
+            let formatted_ed = moment(endDate,'DD-MM-YYYY').add(1,'day')
              console.log('here')
              console.log('billStart',startDate)
              console.log('billEnd', endDate)
-            billModel.find({'date':{ $gte:startDate, $lte:endDate}}).sort({ _id: -1 })
+            billModel.find({'createdOn':{ $gte:formatted_sd.format(), $lte:formatted_ed.format()}}).sort({ _id: -1 })
                 .lean()
                 .exec((err, result) => {
                     if (err) {
@@ -57,7 +59,7 @@ let getAllBill = (req, res) => {
                                 console.log('here', user[key])
                                 if (key === 'createdOn') {
         
-                                    isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
+                                    // isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
                                 } else {
                                     isValid = isValid && user[key] == filters[key];
                                 }
@@ -160,10 +162,12 @@ let getAllBill = (req, res) => {
 
 
     if(startDate && endDate) {
+        let formatted_sd = moment(startDate,'DD-MM-YYYY')
+        let formatted_ed = moment(endDate,'DD-MM-YYYY').add(1,'day')
          console.log('here')
          console.log('billStart',startDate)
          console.log('billEnd', endDate)
-        billModel.find({'date':{ $gte:startDate, $lte:endDate}}).sort({ _id: -1 })
+        billModel.find({'createdOn':{ $gte:formatted_sd.format(), $lte:formatted_ed.format()}}).sort({ _id: -1 })
             .lean()
             .exec((err, result) => {
                 if (err) {
