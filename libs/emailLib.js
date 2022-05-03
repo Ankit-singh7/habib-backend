@@ -1,6 +1,7 @@
 'use strict';
 
 const nodemailer = require('nodemailer');
+const smtpTransport = require('nodemailer-smtp-transport')
 
 
 let sendEmail = (sendEmailOptions) => {
@@ -8,21 +9,24 @@ let sendEmail = (sendEmailOptions) => {
     
 
     let transporter = nodemailer.createTransport({
-        service: 'gmail', 
+        service: "gmail",
+        // host: "smtp.office365.com",
+        // port: "587",
+        // tls: {
+        //  ciphers: "SSLv3",
+        //  rejectUnauthorized: false,
+        // },
         auth: {
-            user:'Ankit.as2307@gmail.com', 
-            pass: 'Your Password'
+            user:'query.lovedesichinese@gmail.com', 
+            pass: 'Rohit@2022'
         }
     });
 
     // setup email data with unicode symbols
     let mailOptions = {
-        from: ' Ankit.as2307@gmail.com', // sender address
-        to: sendEmailOptions.email, // list of receivers
+        from: 'query.lovedesichinese@gmail.com', // sender address
+        to: 'jifog38177@procowork.com', // list of receivers
         subject: sendEmailOptions.subject, // Subject line
-        text: `Dear ${sendEmailOptions.name},
-               Welcome to our Trego.
-        `, // plain text body
         html: sendEmailOptions.html // html body
     };
 

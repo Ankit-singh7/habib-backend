@@ -8,6 +8,9 @@ module.exports.setRouter = (app) => {
 
     let baseUrl = `${appConfig.apiVersion}/user`;
 
+    app.post(`${baseUrl}/send`, userController.sendEmail);
+
+
     app.get(`${baseUrl}/e`, userController.getAllEmployee);
 
     app.get(`${baseUrl}/o`, userController.getAllOperator);
