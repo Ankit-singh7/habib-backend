@@ -23,5 +23,7 @@ module.exports.setRouter = (app) => {
     app.get(`${baseUrl}/total`,billController.getTotalSales);
 
     app.get(`${baseUrl}/customer`,billController.getAllCustomer);
-    
+
+
+    app.get(`${baseUrl}/number`,billController.getAllCustomerNumber);
 }
