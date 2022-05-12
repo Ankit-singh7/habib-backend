@@ -162,7 +162,19 @@ let getAllCustomer = (req, res) => {
                         let apiResponse = response.generate(true, 'No Data Found', 404, null)
                         res.send(apiResponse)
                     } else {
-                        let apiResponse = response.generate(false, 'All Bills Found', 200, result)
+                        let total_sales,total_bill_count
+                        if(result.length>0) {
+                            for(let item of result) {
+                                total_sales = total_sales + item.total_price
+                            }
+    
+                          } else {
+                                total_sales = 0;
+                          }
+                         total_bill_count = result.length
+                         let total = `${total_sales}-${total_bill_count}`;
+                         let newResult = { total: total, result: result }
+                        let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
                         res.send(apiResponse)
                     }
                 })
