@@ -162,7 +162,8 @@ let getAllCustomer = (req, res) => {
                         let apiResponse = response.generate(true, 'No Data Found', 404, null)
                         res.send(apiResponse)
                     } else {
-                        let total_sales,total_bill_count
+                        let total_sales = 0
+                        let total_bill_count = 0
                         if(result.length>0) {
                             for(let item of result) {
                                 total_sales = total_sales + item.total_price
