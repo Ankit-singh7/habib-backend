@@ -198,25 +198,25 @@ let getAllBill = (req, res) => {
                     });
                     // const startIndex = (page - 1) * limit;
                     // const endIndex = page * limit
-                    let total = result.length;
+                    let total_sales = 0;
+                    let total_bill_count = result.length;
                     // let billList = filteredUsers.slice(startIndex, endIndex)
                     let billList = filteredUsers
                     for(let item of billList) {
                         let products = [];
                         let services = [];
-                        let total = 0;
                         let productsArr = JSON.parse(JSON.stringify(item.products));
                         let servicesArr = JSON.parse(JSON.stringify(item.services));
 
                         for(let product of productsArr) {
                             if(product.employee_id === employee_id) {
-                                total = total + product.total
+                                total_sales = total_sales + product.total
                                  products.push(product)
                             }
                         }
                         for(let service of servicesArr) {
                             if(service.employee_id === employee_id) {
-                                total = total + service.total
+                                total_sales = total_sales + service.total
                                 services.push(service)
                             }
                         }
@@ -232,7 +232,9 @@ let getAllBill = (req, res) => {
                         
                     }
 
-                    let newResult = { total: total, result: employeeSalesList }
+                    let total_r  = `${total_sales}-${total_bill_count}`;
+
+                    let newResult = { total: total_r, result: employeeSalesList }
                     let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
                     res.send(apiResponse)
                 }
@@ -273,27 +275,27 @@ let getAllBill = (req, res) => {
                 
           // const startIndex = (page - 1) * limit;
                     // const endIndex = page * limit
-                    let total = result.length;
+                    let total_sales = 0;
+                    let total_bill_count = result.length;
                     // let billList = filteredUsers.slice(startIndex, endIndex)
                     let billList = filteredUsers
                     console.log('billList',billList)
                     for(let item of billList) {
                         let products = [];
                         let services = [];
-                        let total = 0;
                         let productsArr = JSON.parse(JSON.stringify(item.products));
                         console.log('productsArr',productsArr)
                         let servicesArr = JSON.parse(JSON.stringify(item.services));
                         console.log('servicesArr', servicesArr)
                         for(let product of productsArr) {
                             if(product.employee_id === employee_id) {
-                                total = total + product.total
+                                total_sales = total_sales + product.total
                                  products.push(product)
                             }
                         }
                         for(let service of servicesArr) {
                             if(service.employee_id === employee_id) {
-                                total = total + service.total
+                                total_sales = total_sales + service.total
                                 services.push(service)
                             }
                         }
@@ -308,8 +310,10 @@ let getAllBill = (req, res) => {
                         employeeSalesList.push(item)
                         
                     }
+
+                    let total_r = `${total_sales}-${total_bill_count}`;
                     
-                    let newResult = { total: total, result: employeeSalesList }
+                    let newResult = { total: total_r, result: employeeSalesList }
                     console.log('employeeList',employeeSalesList)
                     let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
                     res.send(apiResponse)

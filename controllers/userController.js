@@ -600,7 +600,7 @@ let sendEmail = (req,res) => {
                        
                     <p>${req.body.message}</p>
 
-                    <p>Contact No: - ${req.body.email}</p>                             
+                    <p>Email: - ${req.body.email}</p>                             
                    
        
                    <br><b>Love Desi Chinese</b>
