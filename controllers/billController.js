@@ -220,7 +220,7 @@ let getAllBill = (req, res) => {
                             }
                         }
 
-                        if(products.length>0 || services.length > 0) {
+                        if(products.length || services.length) {
 
                             delete item.products
                             delete item.services
