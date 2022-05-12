@@ -169,7 +169,7 @@ let getAllCustomer = (req, res) => {
 }
 
 let getAllCustomerNumber = (req, res) => {
-    const number = new RegExp(req.query.customer_phone,'i')        
+    const number = `/${req.query.customer_phone}/`      
             billModel.find({'customer_phone':number}).sort({ _id: -1 })
                 .lean()
                 .exec((err, result) => {
