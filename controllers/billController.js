@@ -201,9 +201,9 @@ let getAllBill = (req, res) => {
                     let total_bill_count = result.length;
                     // let billList = filteredUsers.slice(startIndex, endIndex)
                     let billList = filteredUsers
-                    let products = [];
-                    let services = [];
                     for(let item of billList) {
+                        let products = [];
+                        let services = [];
                         let productsArr = JSON.parse(JSON.stringify(item.products));
                         let servicesArr = JSON.parse(JSON.stringify(item.services));
 
@@ -220,8 +220,8 @@ let getAllBill = (req, res) => {
                             }
                         }
 
-                        if(products.length || services.length) {
-
+                        if(products.length > 0 || services.length > 0) {
+       
                             delete item.products
                             delete item.services
                             item.employee_id = employee_id
