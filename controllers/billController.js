@@ -181,7 +181,6 @@ let getAllBill = (req, res) => {
                     res.send(apiResponse)
                 } else {
                     const filteredUsers = result.filter(user => {
-                        console.log('here', user)
                         let isValid = true;
                         for (key in filters) {
                             console.log(filters[key])
@@ -220,12 +219,16 @@ let getAllBill = (req, res) => {
                                 services.push(service)
                             }
                         }
-                        delete item.products
-                        delete item.services
-                        item.employee_id = employee_id
-                        item.products = products
-                        item.services = services
-                        employeeSalesList.push(item)
+
+                        if(products.length>0 || services.length > 0) {
+
+                            delete item.products
+                            delete item.services
+                            item.employee_id = employee_id
+                            item.products = products
+                            item.services = services
+                            employeeSalesList.push(item)
+                        }
                         
                     }
 
@@ -296,12 +299,16 @@ let getAllBill = (req, res) => {
                                 services.push(service)
                             }
                         }
-                        delete item.products
-                        delete item.services
-                        item.employee_id = employee_id
-                        item.products = products
-                        item.services = services
-                        employeeSalesList.push(item)
+                   
+                        if(products.length>0 || services.length > 0) {
+
+                            delete item.products
+                            delete item.services
+                            item.employee_id = employee_id
+                            item.products = products
+                            item.services = services
+                            employeeSalesList.push(item)
+                        }
                         
                     }
 
