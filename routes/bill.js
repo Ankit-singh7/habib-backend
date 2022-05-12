@@ -21,4 +21,7 @@ module.exports.setRouter = (app) => {
     app.get(`${baseUrl}/:id/getById`,billController.getBillDetail);
 
     app.get(`${baseUrl}/total`,billController.getTotalSales);
+
+    app.get(`${baseUrl}/customer`,billController.getAllCustomer);
+    
 }

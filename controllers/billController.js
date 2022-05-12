@@ -145,6 +145,33 @@ let getAllBill = (req, res) => {
 
 }
 
+
+
+let getAllCustomer = (req, res) => {
+    const name = new RegExp(req.query.customer_name,'i')        
+            billModel.find({'customer_name':name}).sort({ _id: -1 })
+                .lean()
+                .exec((err, result) => {
+                    if (err) {
+                        console.log(err)
+                        logger.error(err.message, 'Bill Controller: getAllBill', 10)
+                        let apiResponse = response.generate(true, 'Failed To Find Food Sub-Category Details', 500, null)
+                        res.send(apiResponse)
+                    } else if (check.isEmpty(result)) {
+                        logger.info('No Data Found', 'Bill Controller: getAllBill')
+                        let apiResponse = response.generate(true, 'No Data Found', 404, null)
+                        res.send(apiResponse)
+                    } else {
+                        let apiResponse = response.generate(false, 'All Bills Found', 200, result)
+                        res.send(apiResponse)
+                    }
+                })
+}
+
+
+
+
+
  function getEmployeeSales(req, res,sd,ed){
      console.log('here inside employee sales')
     let employeeSalesList = [];
@@ -1008,5 +1035,6 @@ module.exports = {
     deleteBill: deleteBill,
     updateBill: updateBill,
     changeStatus: changeStatus,
-    getTotalSales: getTotalSales
+    getTotalSales: getTotalSales,
+    getAllCustomer:getAllCustomer
 }
