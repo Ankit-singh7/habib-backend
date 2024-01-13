@@ -59,30 +59,18 @@ let getAllSalesReport = (req, res) => {
         salesReportModel.aggregate([
             {
                 $match: {
-                    'date': {
-                        $gte: new Date(`${year}-01-01T00:00:00.000Z`),
-                        $lte: new Date(`${year}-12-31T23:59:59.999Z`)
+                    $expr: {
+                        $and: [
+                            { $gte: [{ $year: { $dateFromString: { dateString: "$date", format: "%d-%m-%Y" } } }, parseInt(year)] },
+                            { $lte: [{ $year: { $dateFromString: { dateString: "$date", format: "%d-%m-%Y" } } }, parseInt(year)] },
+                        ]
                     }
                 }
             },
             {
                 $group: {
                     _id: {
-                        month: {
-                            $month: {
-                                $dateFromString: {
-                                    dateString: {
-                                        $concat: [
-                                            { $substr: ["$date", 3, 2] },
-                                            '-',
-                                            { $substr: ["$date", 0, 2] },
-                                            '-',
-                                            { $substr: ["$date", 6, 4] }
-                                        ]
-                                    }
-                                }
-                            }
-                        }
+                        month: { $month: { $dateFromString: { dateString: "$date", format: "%d-%m-%Y" } } }
                     },
                     total: { $sum: 1 },
                     result: { $push: "$$ROOT" }
