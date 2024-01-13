@@ -51,7 +51,7 @@ let getAllSalesReport = (req, res) => {
         })
     } 
 
-    let getAllSalesReport = (req, res) => {
+    let getSalesReportYearlyMonthWise = (req, res) => {
         const filters = req.query;
         const year = req.query.year;
     
