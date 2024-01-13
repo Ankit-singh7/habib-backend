@@ -56,48 +56,45 @@ let getAllSalesReport = (req, res) => {
         const filters = req.query;
         const year = req.query.year;
     
-        salesReportModel.aggregate([
-            {
-                $match: {
-                    date: {
-                        $regex: `^\\d{2}-${year.slice(-2)}-\\d{4}$`
-                    }
-                }
-            },
-            {
-                $group: {
-                    _id: {
-                        month: { $toInt: { $substr: ["$date", 3, 2] } }
-                    },
-                    total: { $sum: 1 },
-                    result: { $push: "$$ROOT" }
-                }
-            },
-            {
-                $sort: {
-                    '_id.month': 1
-                }
-            }
-        ]).exec((err, result) => {
+        salesReportModel.find({}).exec((err, allResults) => {
             if (err) {
                 res.send(err);
-            } else if (check.isEmpty(result)) {
-                let apiResponse = response.generate(false, 'No sales data found for the given year', 200, null);
-                res.send(apiResponse);
             } else {
-                let formattedResult = result.map(item => {
-                    return {
-                        month: item._id.month,
-                        total: item.total,
-                        result: item.result.sort((a, b) => a.product_name.localeCompare(b.product_name))
-                    };
+                const filteredResults = allResults.filter(result => {
+                    const resultYear = parseInt(result.date.substring(6, 10));
+                    return resultYear === parseInt(year);
                 });
     
-                let apiResponse = response.generate(false, 'Sales data found', 200, formattedResult);
-                res.send(apiResponse);
+                const groupedResults = groupByMonth(filteredResults);
+    
+                if (check.isEmpty(groupedResults)) {
+                    let apiResponse = response.generate(false, 'No sales data found for the given year', 200, null);
+                    res.send(apiResponse);
+                } else {
+                    let apiResponse = response.generate(false, 'Sales data found', 200, groupedResults);
+                    res.send(apiResponse);
+                }
             }
         });
     };
+    
+    function groupByMonth(results) {
+        const grouped = results.reduce((acc, result) => {
+            const month = parseInt(result.date.substring(3, 5));
+            if (!acc[month]) {
+                acc[month] = [];
+            }
+            acc[month].push(result);
+            return acc;
+        }, {});
+    
+        return Object.keys(grouped).map(month => ({
+            month: parseInt(month),
+            total: grouped[month].length,
+            result: grouped[month].sort((a, b) => a.product_name.localeCompare(b.product_name))
+        }));
+    }
+    
     
     
     
