@@ -51,55 +51,54 @@ let getAllSalesReport = (req, res) => {
         })
     } 
 
-let getSalesReportYearlyMonthWise = (req, res) => {
-    const filters = req.query;
-    // const year = req.query.year;
-    const year = 2023;
-
-    salesReportModel.aggregate([
-        {
-            $match: {
-                'date': {
-                    $gte: new Date(`01-01-${year}`),
-                    $lte: new Date(`31-12-${year}`)
+    let getAllSalesReport = (req, res) => {
+        const filters = req.query;
+        const year = req.query.year;
+    
+        salesReportModel.aggregate([
+            {
+                $match: {
+                    'date': {
+                        $gte: new Date(`${year}-01-01T00:00:00.000Z`),
+                        $lte: new Date(`${year}-12-31T23:59:59.999Z`)
+                    }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        month: { $month: { $dateFromString: { dateString: "$date", format: "%d-%m-%Y" } } }
+                    },
+                    total: { $sum: 1 },
+                    result: { $push: "$$ROOT" }
+                }
+            },
+            {
+                $sort: {
+                    '_id.month': 1
                 }
             }
-        },
-        {
-            $group: {
-                _id: {
-                    month: { $month: "$date" }
-                },
-                total: { $sum: 1 },
-                result: { $push: "$$ROOT" }
+        ]).exec((err, result) => {
+            if (err) {
+                res.send(err);
+            } else if (check.isEmpty(result)) {
+                let apiResponse = response.generate(false, 'No sales data found for the given year', 200, null);
+                res.send(apiResponse);
+            } else {
+                let formattedResult = result.map(item => {
+                    return {
+                        month: item._id.month,
+                        total: item.total,
+                        result: item.result.sort((a, b) => a.product_name.localeCompare(b.product_name))
+                    };
+                });
+    
+                let apiResponse = response.generate(false, 'Sales data found', 200, formattedResult);
+                res.send(apiResponse);
             }
-        },
-        {
-            $sort: {
-                '_id.month': 1
-            }
-        }
-    ]).exec((err, result) => {
-        if (err) {
-            res.send(err);
-        } else if (check.isEmpty(result)) {
-            let apiResponse = response.generate(false, 'No sales data found for the given year', 200, null);
-            res.send(apiResponse);
-        } else {
-            let formattedResult = result.map(item => {
-                return {
-                    month: item._id.month,
-                    total: item.total,
-                    result: item.result.sort((a, b) => a.product_name.localeCompare(b.product_name))
-                };
-            });
-
-            let apiResponse = response.generate(false, 'Sales data found', 200, formattedResult);
-            res.send(apiResponse);
-        }
-    });
-};
-
+        });
+    };
+    
 
 
 
