@@ -61,8 +61,8 @@ let getAllSalesReport = (req, res) => {
                 $match: {
                     $expr: {
                         $and: [
-                            { $gte: [{ $year: { $dateFromString: { dateString: "$date", format: "%d-%m-%Y" } } }, parseInt(year)] },
-                            { $lte: [{ $year: { $dateFromString: { dateString: "$date", format: "%d-%m-%Y" } } }, parseInt(year)] },
+                            { $gte: [{ $toInt: { $substr: ["$date", 6, 2] } }, parseInt(year)] },
+                            { $lte: [{ $toInt: { $substr: ["$date", 6, 2] } }, parseInt(year)] },
                         ]
                     }
                 }
@@ -70,7 +70,7 @@ let getAllSalesReport = (req, res) => {
             {
                 $group: {
                     _id: {
-                        month: { $month: { $dateFromString: { dateString: "$date", format: "%d-%m-%Y" } } }
+                        month: { $toInt: { $substr: ["$date", 3, 2] } }
                     },
                     total: { $sum: 1 },
                     result: { $push: "$$ROOT" }
@@ -101,6 +101,7 @@ let getAllSalesReport = (req, res) => {
             }
         });
     };
+    
     
     
 
