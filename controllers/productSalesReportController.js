@@ -59,10 +59,8 @@ let getAllSalesReport = (req, res) => {
         salesReportModel.aggregate([
             {
                 $match: {
-                    $expr: {
-                        $and: [
-                            { $regexMatch: { input: "$date", regex: `^\\d{2}-${year.slice(-2)}-\\d{2}$` } }
-                        ]
+                    date: {
+                        $regex: `^\\d{2}-${year.slice(-2)}-\\d{4}$`
                     }
                 }
             },
