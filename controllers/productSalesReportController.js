@@ -61,8 +61,7 @@ let getAllSalesReport = (req, res) => {
                 $match: {
                     $expr: {
                         $and: [
-                            { $gte: [{ $toInt: { $substr: ["$date", 6, 2] } }, parseInt(year)] },
-                            { $lte: [{ $toInt: { $substr: ["$date", 6, 2] } }, parseInt(year)] },
+                            { $regexMatch: { input: "$date", regex: `^\\d{2}-${year.slice(-2)}-\\d{2}$` } }
                         ]
                     }
                 }
