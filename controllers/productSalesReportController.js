@@ -51,6 +51,7 @@ let getAllSalesReport = (req, res) => {
         })
     } 
 
+    
     let getSalesReportYearlyMonthWise = (req, res) => {
         const filters = req.query;
         const year = req.query.year;
@@ -67,7 +68,21 @@ let getAllSalesReport = (req, res) => {
             {
                 $group: {
                     _id: {
-                        month: { $month: { $dateFromString: { dateString: "$date", format: "%d-%m-%Y" } } }
+                        month: {
+                            $month: {
+                                $dateFromString: {
+                                    dateString: {
+                                        $concat: [
+                                            { $substr: ["$date", 3, 2] },
+                                            '-',
+                                            { $substr: ["$date", 0, 2] },
+                                            '-',
+                                            { $substr: ["$date", 6, 4] }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
                     },
                     total: { $sum: 1 },
                     result: { $push: "$$ROOT" }
@@ -98,6 +113,7 @@ let getAllSalesReport = (req, res) => {
             }
         });
     };
+    
     
 
 
