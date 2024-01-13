@@ -60,8 +60,8 @@ let getSalesReportYearlyMonthWise = (req, res) => {
         {
             $match: {
                 'date': {
-                    $gte: new Date(`${year}-01-01`),
-                    $lte: new Date(`${year}-12-31`)
+                    $gte: new Date(`01-01-${year}`),
+                    $lte: new Date(`31-12-${year}`)
                 }
             }
         },
