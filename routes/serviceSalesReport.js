@@ -10,5 +10,6 @@ module.exports.setRouter = (app) => {
 
     app.get(`${baseUrl}/view/all`, salesReportController.getAllSalesReport);
 
+    app.get(`${baseUrl}/view/yearly-month-wise`, salesReportController.getSalesReportYearlyMonthWise);
 
 }

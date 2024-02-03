@@ -54,8 +54,62 @@ let getAllSalesReport = (req, res) => {
 
 }
 
+let getSalesReportYearlyMonthWise = (req, res) => {
+    const filters = req.query;
+    const year = req.query.year;
+    delete filters.year;
+
+    salesReportModel.find({}).exec((err, allResults) => {
+        if (err) {
+            res.send(err);
+        } else {
+            let yearlyResult = allResults.filter(result => {
+                const resultYear = parseInt(result.date.substring(6, 10));
+                return resultYear === parseInt(year);
+            });
+
+            const filteredResults = yearlyResult.filter(user => {
+                let isValid = true;
+                for (key in filters) {
+                        isValid = isValid && user[key] == filters[key];                      
+                }
+                return isValid;
+            });
+
+            const groupedResults = groupByMonth(filteredResults);
+
+            if (check.isEmpty(groupedResults)) {
+                let apiResponse = response.generate(false, 'No sales data found for the given year', 200, null);
+                res.send(apiResponse);
+            } else {
+                let apiResponse = response.generate(false, 'Sales data found', 200, groupedResults);
+                res.send(apiResponse);
+            }
+        }
+    });
+};
+
+function groupByMonth(results) {
+    const grouped = results.reduce((acc, result) => {
+        const month = parseInt(result.date.substring(3, 5));
+        if (!acc[month]) {
+            acc[month] = [];
+        }
+        acc[month].push(result);
+        return acc;
+    }, {});
+
+    return Object.keys(grouped).map(month => ({
+        month: parseInt(month),
+        total: grouped[month].length,
+        result: grouped[month].sort((a, b) => a.service_name.localeCompare(b.service_name))
+    }));
+}
+
+
 
 
 module.exports = {
-    getAllSalesReport:getAllSalesReport
+    getAllSalesReport:getAllSalesReport,
+    getSalesReportYearlyMonthWise: getSalesReportYearlyMonthWise
 }
