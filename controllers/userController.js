@@ -59,10 +59,6 @@ let getAllEmployee = (req,res) => {
                 const endIndex = page * limit
                 let total = result.length;
                 let empList = filteredUsers.slice(startIndex, endIndex)
-                // // let empList = result.slice(startIndex,endIndex)
-                // let sortResult = empList.sort(function(a,b) {
-                //     return a.f_name.localeCompare(b.f_name); //using String.prototype.localCompare()
-                // })
                 let newResult = {total:total,result:empList}
                 let apiResponse = response.generate(false, 'All User Details Found', 200, newResult)
                 res.send(apiResponse)
@@ -76,9 +72,12 @@ let getAllOperator = (req,res) => {
     const page = req.query.current_page
     const limit = req.query.per_page
     const filters = req.query;
+    let searchQuery;
+    req.query.f_name ? searchQuery = { 'role': 'operator', 'f_name': { $regex: new RegExp(req.query.f_name, 'i') } } : searchQuery = {'role': 'operator'}
     delete filters.current_page
     delete filters.per_page
-    UserModel.find({'role': 'operator'})
+    delete filters.f_name
+    UserModel.find(searchQuery)
         .select(' -__v -_id')
         .lean()
         .exec((err, result) => {
@@ -111,10 +110,7 @@ let getAllOperator = (req,res) => {
                 const endIndex = page * limit
                 let total = result.length;
                 let empList = filteredUsers.slice(startIndex, endIndex)
-                let sortResult = empList.sort(function(a,b) {
-                    return a.f_name.localeCompare(b.f_name); //using String.prototype.localCompare()
-                })
-                let newResult = {total:total,result:sortResult}
+                let newResult = {total:total,result:empList}
                 let apiResponse = response.generate(false, 'All User Details Found', 200, newResult)
                 res.send(apiResponse)
             }
