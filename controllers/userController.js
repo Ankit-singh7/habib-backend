@@ -25,7 +25,7 @@ let getAllEmployee = (req,res) => {
     const limit = req.query.per_page?req.query.per_page:1000
     const filters = req.query;
     let searchQuery;
-    req.query.f_name ? searchQuery = { 'role': 'employee', 'name': { $regex: new RegExp(req.query.name, 'i') } } : searchQuery = {'role': 'employee'}
+    req.query.f_name ? searchQuery = { 'role': 'employee', 'f_name': { $regex: new RegExp(req.query.f_name, 'i') } } : searchQuery = {'role': 'employee'}
     delete filters.current_page
     delete filters.per_page
     delete filters.f_name
