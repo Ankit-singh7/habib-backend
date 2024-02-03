@@ -24,9 +24,12 @@ let getAllEmployee = (req,res) => {
     const page = req.query.current_page?req.query.current_page: 1
     const limit = req.query.per_page?req.query.per_page:1000
     const filters = req.query;
+    let searchQuery;
+    req.query.f_name ? searchQuery = { 'role': 'employee', 'name': { $regex: new RegExp(req.query.name, 'i') } } : searchQuery = {'role': 'employee'}
     delete filters.current_page
     delete filters.per_page
-    UserModel.find({'role': 'employee'})
+    delete filters.f_name
+    UserModel.find(searchQuery)
         .select(' -__v -_id')
         .lean()
         .exec((err, result) => {
@@ -56,11 +59,11 @@ let getAllEmployee = (req,res) => {
                 const endIndex = page * limit
                 let total = result.length;
                 let empList = filteredUsers.slice(startIndex, endIndex)
-                // let empList = result.slice(startIndex,endIndex)
-                let sortResult = empList.sort(function(a,b) {
-                    return a.f_name.localeCompare(b.f_name); //using String.prototype.localCompare()
-                })
-                let newResult = {total:total,result:sortResult}
+                // // let empList = result.slice(startIndex,endIndex)
+                // let sortResult = empList.sort(function(a,b) {
+                //     return a.f_name.localeCompare(b.f_name); //using String.prototype.localCompare()
+                // })
+                let newResult = {total:total,result:empList}
                 let apiResponse = response.generate(false, 'All User Details Found', 200, newResult)
                 res.send(apiResponse)
             }
