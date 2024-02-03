@@ -28,21 +28,16 @@ let getAllSalesReport = (req, res) => {
     
             } else {
                 const filteredUsers = result.filter(user => {
-                    console.log('here', user)
                     let isValid = true;
                     for (key in filters) {
-                        console.log(filters[key])
-                        console.log('here', user[key])
-                            isValid = isValid && user[key] == filters[key];
-                        
-
+                            isValid = isValid && user[key] == filters[key];                      
                     }
                     return isValid;
                 });
                 let total = filteredUsers.length;
                 let reportList = filteredUsers
                 let sortResult = reportList.sort(function(a,b) {
-                    return a.product_name.localeCompare(b.product_name);//using String.prototype.localCompare()
+                    return a.product_name.localeCompare(b.product_name);
                 })
                 let newResult = {total:total,result:sortResult}
                 let apiResponse = response.generate(false, 'All sales Found', 200, newResult)
@@ -55,14 +50,23 @@ let getAllSalesReport = (req, res) => {
     let getSalesReportYearlyMonthWise = (req, res) => {
         const filters = req.query;
         const year = req.query.year;
+        delete filters.year;
     
         salesReportModel.find({}).exec((err, allResults) => {
             if (err) {
                 res.send(err);
             } else {
-                const filteredResults = allResults.filter(result => {
+                let yearlyResult = allResults.filter(result => {
                     const resultYear = parseInt(result.date.substring(6, 10));
                     return resultYear === parseInt(year);
+                });
+
+                const filteredResults = yearlyResult.filter(user => {
+                    let isValid = true;
+                    for (key in filters) {
+                            isValid = isValid && user[key] == filters[key];                      
+                    }
+                    return isValid;
                 });
     
                 const groupedResults = groupByMonth(filteredResults);
