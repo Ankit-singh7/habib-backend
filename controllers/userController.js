@@ -31,7 +31,6 @@ let getAllEmployee = (req,res) => {
         .lean()
         .exec((err, result) => {
             if (err) {
-                console.log(err)
                 logger.error(err.message, 'User Controller: getAllUser', 10)
                 let apiResponse = response.generate(true, 'Failed To Find User Details', 500, null)
                 res.send(apiResponse)
@@ -41,14 +40,14 @@ let getAllEmployee = (req,res) => {
                 res.send(apiResponse)
             } else {
                 const filteredUsers = result.filter(user => {
-                    console.log('here', user)
                     let isValid = true;
                     for (key in filters) {
-                        console.log(filters[key])
-                        console.log('here', user[key])
-               
+                        if (key === 'createdOn') {
+
+                            isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
+                        } else {
                             isValid = isValid && user[key] == filters[key];
-                        
+                        }
 
                     }
                     return isValid;
@@ -80,8 +79,7 @@ let getAllOperator = (req,res) => {
         .select(' -__v -_id')
         .lean()
         .exec((err, result) => {
-            if (err) {
-                console.log(err)
+            if (err) {           
                 logger.error(err.message, 'User Controller: getAllUser', 10)
                 let apiResponse = response.generate(true, 'Failed To Find User Details', 500, null)
                 res.send(apiResponse)
