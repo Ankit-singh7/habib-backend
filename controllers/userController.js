@@ -42,23 +42,25 @@ let getAllEmployee = (req,res) => {
                 let apiResponse = response.generate(true, 'No User Found', 404, null)
                 res.send(apiResponse)
             } else {
-                const filteredUsers = result.filter(user => {
-                    let isValid = true;
-                    for (key in filters) {
-                        if (key === 'createdOn') {
-
-                            isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
-                        } else {
-                            isValid = isValid && user[key] == filters[key];
+                     const filteredUsers = result.filter(user => {
+                        let isValid = true;
+                        for (key in filters) {
+                            if (key === 'createdOn') {
+    
+                                isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
+                            } else if(key === 'status') {
+                                isValid = isValid && user[key].toLowerCase() == filters[key].toLowerCase();
+                            } else {
+                                isValid = isValid && user[key] == filters[key];
+                            }
+    
                         }
-
-                    }
-                    return isValid;
-                });
+                        return isValid;
+                    });
                 const startIndex = (page - 1)*limit;
                 const endIndex = page * limit
                 let total = result.length;
-                let empList = filteredUsers.slice(startIndex, endIndex)
+                let empList = filteredUsers.slice(startIndex, endIndex).sort((a,b) => (a.f_name).localeCompare(b.f_name));
                 let newResult = {total:total,result:empList}
                 let apiResponse = response.generate(false, 'All User Details Found', 200, newResult)
                 res.send(apiResponse)
