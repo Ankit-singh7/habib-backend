@@ -15,21 +15,15 @@ let getAllBranch = (req,res) => {
     .select('-__v -_id')
     .exec((err,result) => {
         if(err) {
-            console.log(err)
-            logger.error(err.message, 'Branch Controller: getAllBranch', 10)
             let apiResponse = response.generate(true, 'Failed To Find ', 500, null)
             res.send(apiResponse)
         }  else if (check.isEmpty(result)) {
-            logger.info('No Data Found', 'Branch Controller: getAllBranch')
             let apiResponse = response.generate(true, 'No Data Found', 404, null)
             res.send(apiResponse)
         }  else {
             const filteredUsers = result.filter(user => {
-                console.log('here', user)
                 let isValid = true;
                 for (key in filters) {
-                    console.log(filters[key])
-                    console.log('here', user[key])
            
                         isValid = isValid && user[key] == filters[key];
                     
@@ -57,12 +51,9 @@ let getSingleBranchDetail = (req, res) => {
         .lean()
         .exec((err, result) => {
             if (err) {
-                console.log(err)
-                logger.error(err.message, 'Branch Controller: getSingleBranchDetail', 10)
                 let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
                 res.send(apiResponse)
             } else if (check.isEmpty(result)) {
-                logger.info('No User Found', 'Branch Controller: getSingleBranchDetail')
                 let apiResponse = response.generate(true, 'No Detail Found', 404, null)
                 res.send(apiResponse)
             } else {
@@ -74,7 +65,6 @@ let getSingleBranchDetail = (req, res) => {
 
 
 let createBranch = (req,res) => {
-    console.log(req.body)
     let newCategory = new branchModel({
         branch_id: shortid.generate(),
         branch_name: req.body.name,
@@ -93,8 +83,6 @@ let createBranch = (req,res) => {
 
     newCategory.save((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Branch Controller: createBranch', 10)
             let apiResponse = response.generate(true, 'Failed To create new Branch', 500, null)
             res.send(apiResponse)
         } else {
@@ -109,12 +97,9 @@ let deleteBranch = (req,res) => {
     branchModel.findOneAndRemove({'branch_id':req.params.id})
     .exec((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Branch Controller: deleteBranch', 10)
             let apiResponse = response.generate(true, 'Failed To delete Branch', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
-            logger.info('No Branch Found', 'Branch Controller: deleteBranch')
             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
             res.send(apiResponse)
         } else {
@@ -130,12 +115,9 @@ let updateBranch = (req,res) => {
     branchModel.updateOne({'branch_id':req.params.id},option,{multi:true})
     .exec((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Branch Controller: branch', 10)
             let apiResponse = response.generate(true, 'Failed To update branch', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
-            logger.info('No Branch Found', 'Branch Controller: branch')
             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
             res.send(apiResponse)
         } else {

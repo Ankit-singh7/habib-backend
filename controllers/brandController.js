@@ -15,25 +15,16 @@ let getAllBrand = (req,res) => {
     .select('-__v -_id')
     .exec((err,result) => {
         if(err) {
-            console.log(err)
-            logger.error(err.message, 'Brand Controller: getAllBranch', 10)
             let apiResponse = response.generate(true, 'Failed To Find ', 500, null)
             res.send(apiResponse)
         }  else if (check.isEmpty(result)) {
-            logger.info('No Data Found', 'Brand Controller: getAllBranch')
             let apiResponse = response.generate(true, 'No Data Found', 404, null)
             res.send(apiResponse)
         }  else {
             const filteredUsers = result.filter(user => {
-                console.log('here', user)
                 let isValid = true;
-                for (key in filters) {
-                    console.log(filters[key])
-                    console.log('here', user[key])
-           
-                        isValid = isValid && user[key] == filters[key];
-                    
-
+                for (key in filters) {           
+                        isValid = isValid && user[key] == filters[key];                 
                 }
                 return isValid;
             });
@@ -57,12 +48,9 @@ let getSingleBrandDetail = (req, res) => {
         .lean()
         .exec((err, result) => {
             if (err) {
-                console.log(err)
-                logger.error(err.message, 'Brand Controller: getSingleBranchDetail', 10)
                 let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
                 res.send(apiResponse)
             } else if (check.isEmpty(result)) {
-                logger.info('No User Found', 'Brand Controller: getSingleBranchDetail')
                 let apiResponse = response.generate(true, 'No Detail Found', 404, null)
                 res.send(apiResponse)
             } else {
@@ -74,7 +62,6 @@ let getSingleBrandDetail = (req, res) => {
 
 
 let createBrand = (req,res) => {
-    console.log(req.body)
     let newCategory = new brandModel({
         brand_id: shortid.generate(),
         name: req.body.name,
@@ -83,8 +70,6 @@ let createBrand = (req,res) => {
 
     newCategory.save((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Brand Controller: createBranch', 10)
             let apiResponse = response.generate(true, 'Failed To create new Brand', 500, null)
             res.send(apiResponse)
         } else {
@@ -99,12 +84,9 @@ let deleteBrand = (req,res) => {
     brandModel.findOneAndRemove({'brand_id':req.params.id})
     .exec((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Brand Controller: deleteBranch', 10)
             let apiResponse = response.generate(true, 'Failed To delete Branch', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
-            logger.info('No Brand Found', 'Brand Controller: deleteBranch')
             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
             res.send(apiResponse)
         } else {
@@ -120,12 +102,9 @@ let updateBrand = (req,res) => {
     brandModel.updateOne({'brand_id':req.params.id},option,{multi:true})
     .exec((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Brand Controller: branch', 10)
             let apiResponse = response.generate(true, 'Failed To update branch', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
-            logger.info('No Brand Found', 'Brand Controller: branch')
             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
             res.send(apiResponse)
         } else {

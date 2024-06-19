@@ -93,11 +93,8 @@ let getAllOperator = (req,res) => {
                 res.send(apiResponse)
             } else {
                 const filteredUsers = result.filter(user => {
-                    console.log('here', user)
                     let isValid = true;
                     for (key in filters) {
-                        console.log(filters[key])
-                        console.log('here', user[key])
                         if (key === 'createdOn') {
 
                             isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
@@ -130,8 +127,6 @@ let getAllStockManager = (req,res) => {
         .lean()
         .exec((err, result) => {
             if (err) {
-                console.log(err)
-                logger.error(err.message, 'User Controller: getAllUser', 10)
                 let apiResponse = response.generate(true, 'Failed To Find User Details', 500, null)
                 res.send(apiResponse)
             } else if (check.isEmpty(result)) {
@@ -160,8 +155,6 @@ let getAllAdmin = (req,res) => {
         .lean()
         .exec((err, result) => {
             if (err) {
-                console.log(err)
-                logger.error(err.message, 'User Controller: getAllUser', 10)
                 let apiResponse = response.generate(true, 'Failed To Find User Details', 500, null)
                 res.send(apiResponse)
             } else if (check.isEmpty(result)) {
@@ -194,8 +187,6 @@ let getSingleUser = (req, res) => {
         .lean()
         .exec((err, result) => {
             if (err) {
-                console.log(err)
-                logger.error(err.message, 'User Controller: getSingleUser', 10)
                 let apiResponse = response.generate(true, 'Failed To Find User Details', 500, null)
                 res.send(apiResponse)
             } else if (check.isEmpty(result)) {
@@ -220,8 +211,6 @@ let deleteUser = (req, res) => {
     .select('-employee_password -_id -__v -employee_email')
     .exec((err, result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'User Controller: deleteUser', 10)
             let apiResponse = response.generate(true, 'Failed To delete user', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
@@ -247,8 +236,6 @@ let editUser = (req, res) => {
     let options = req.body;
     UserModel.updateOne({ 'user_id': req.params.id }, options).exec((err, result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'User Controller:editUser', 10)
             let apiResponse = response.generate(true, 'Failed To edit user details', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
@@ -312,8 +299,6 @@ let createUser = (req,res) => {
                             let newUser = new UserModel(payload)
                             newUser.save((err, newUser) => {
                                 if (err) {
-                                    console.log(err)
-                                    logger.error(err.message, 'userController: createUser', 10)
                                     let apiResponse = response.generate(true, 'Failed to create new User', 500, null)
                                     reject(apiResponse)
                                 } else {
@@ -327,7 +312,6 @@ let createUser = (req,res) => {
                             let branch_name;
                             branchModel.findOne({'branch_id':req.body.branch_id}).exec((err,result) => {
                                 if(err) {
-                                    console.log(err)
                                 } else {
                                     branch_name = result.branch_name
                                     payload = {
@@ -346,8 +330,6 @@ let createUser = (req,res) => {
                                     let newUser = new UserModel(payload)
                                     newUser.save((err, newUser) => {
                                         if (err) {
-                                            console.log(err)
-                                            logger.error(err.message, 'userController: createUser', 10)
                                             let apiResponse = response.generate(true, 'Failed to create new User', 500, null)
                                             reject(apiResponse)
                                         } else {
@@ -374,8 +356,6 @@ let createUser = (req,res) => {
                             let newUser = new UserModel(payload)
                             newUser.save((err, newUser) => {
                                 if (err) {
-                                    console.log(err)
-                                    logger.error(err.message, 'userController: createUser', 10)
                                     let apiResponse = response.generate(true, 'Failed to create new User', 500, null)
                                     reject(apiResponse)
                                 } else {
@@ -407,7 +387,6 @@ let createUser = (req,res) => {
             res.send(apiResponse)
         })
         .catch((err) => {
-            console.log(err);
             res.send(err);
         })
 
@@ -415,28 +394,21 @@ let createUser = (req,res) => {
 
 let loginFunction = (req, res) => {
     let findUser = () => {
-        //console.log("findUser");
         return new Promise((resolve, reject) => {
             if (req.body.email) {
-                console.log("req body email is there");
-                //console.log(req.body);
                 UserModel.findOne({email: req.body.email}, (err, userDetails) => {
                     /* handle the error here if the User is not found */
                     if (err) {
-                        console.log(err)
-                        logger.error('Failed To Retrieve User Data', 'userController: findUser()', 10)
                         /* generate the error message and the api response message here */
                         let apiResponse = response.generate(true, 'Failed To Find User Details', 500, null)
                         reject(apiResponse)
                         /* if Company Details is not found */
                     } else if (check.isEmpty(userDetails)) {
                         /* generate the response and the console error message here */
-                        logger.error('No User Found', 'userController: findUser()', 7)
                         let apiResponse = response.generate(true, 'No User Found with this email', 404, null)
                         reject(apiResponse)
                     } else {
                         /* prepare the message and the api response here */
-                        logger.info('User Found', 'userController: findUser()', 10)
                         resolve(userDetails)
                     }
                 });
@@ -449,8 +421,6 @@ let loginFunction = (req, res) => {
     }
 
     let validatePassword = (retrievedUserDetails) => {
-        console.log(retrievedUserDetails)
-        console.log("validatePassword");
         return new Promise((resolve, reject) => {
             if(req.body.password === retrievedUserDetails.password) {
                 resolve(retrievedUserDetails)
@@ -472,8 +442,6 @@ let loginFunction = (req, res) => {
             res.send(apiResponse)
         })
         .catch((err) => {
-            console.log("errorhandler");
-            console.log(err);
             res.status(err.status)
             res.send(err)
         })
@@ -491,7 +459,6 @@ let loginFunction = (req, res) => {
 let logout = (req, res) => {
     AuthModel.findOneAndRemove({ userId: req.params.id }, (err, result) => {
         if (err) {
-            console.log(err)
             logger.error(err.message, 'user Controller: logout', 10)
             let apiResponse = response.generate(true, `error occurred: ${err.message}`, 500, null)
             res.send(apiResponse)
@@ -515,7 +482,6 @@ let resetPasswordFunction = (req,res) => {
     .lean()
     .exec((err, result) => {
         if (err) {
-            console.log(err)
             logger.error(err.message, 'User Controller: getAllUser', 10)
             let apiResponse = response.generate(true, 'Failed To Find User Details', 500, null)
             res.send(apiResponse)
@@ -532,7 +498,6 @@ let resetPasswordFunction = (req,res) => {
             .select('-password')
             .exec((err,result) => {
                 if(err) {
-                    console.log(err)
                 } else {
 
                     let apiResponse = response.generate(false, 'User Details Found', 200, result)
@@ -549,7 +514,6 @@ let forgotPasswordFunction = (req,res) => {
     .lean()
     .exec((err, result) => {
         if (err) {
-            console.log(err)
             logger.error(err.message, 'User Controller: getAllUser', 10)
             let apiResponse = response.generate(true, 'Failed To Find User Details', 500, null)
             res.send(apiResponse)
@@ -558,8 +522,6 @@ let forgotPasswordFunction = (req,res) => {
             let apiResponse = response.generate(true, 'No User Found', 404, null)
             res.send(apiResponse)
         } else {
-            console.log(result)
-            console.log(req.body.oldPassword)
             if(req.body.oldPassword === result[0].password) {
 
                 let options = {
@@ -587,7 +549,6 @@ let forgotPasswordFunction = (req,res) => {
 
 
 let sendEmail = (req,res) => {
-    console.log(req.body)
     let sendEmail = () => {
         return new Promise((resolve, reject) => {
             
@@ -620,8 +581,6 @@ let sendEmail = (req,res) => {
         res.send(apiResponse)
     })
     .catch((err) => {
-        console.log("errorhandler");
-        console.log(err);
         res.status(err.status)
         res.send(err)
     })

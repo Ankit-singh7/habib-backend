@@ -17,8 +17,6 @@ let getAllSalesReport = (req, res) => {
     const endDate = req.query.endDate
     delete filters.startDate
     delete filters.endDate
-    console.log(filters)
-        console.log('object')
         salesReportModel.find({'date':{'$gte':new Date(startDate),'$lte':new Date(endDate)}}).exec((err,result) => {
             if(err) {
                 res.send(err)

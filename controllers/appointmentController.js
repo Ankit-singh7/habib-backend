@@ -25,23 +25,16 @@ let getAllAppointment = (req,res) => {
     .lean()
     .exec((err,result) => {
         if(err) {
-            console.log(err)
-            logger.error(err.message, 'Session Controller: getAllSession', 10)
             let apiResponse = response.generate(true, 'Failed To Find Session', 500, null)
             res.send(apiResponse)
         }  else if (check.isEmpty(result)) {
-            logger.info('No Data Found', 'Session Controller: getAllSession')
             let apiResponse = response.generate(true, 'No Data Found', 404, null)
             res.send(apiResponse)
         }  else {
             const filteredUsers = result.filter(user => {
-                console.log('here',user)
                 let isValid = true;
                 for (key in filters) {
-                    console.log(filters[key])
-                  console.log('here',user[key])
                   if(key === 'createdOn') {
-
                       isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
                   } else {
                     isValid = isValid && user[key] == filters[key];
@@ -72,12 +65,9 @@ let getSingleAppointmentDetail = (req, res) => {
         .lean()
         .exec((err, result) => {
             if (err) {
-                console.log(err)
-                logger.error(err.message, 'Branch Controller: getSingleBranchDetail', 10)
                 let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
                 res.send(apiResponse)
             } else if (check.isEmpty(result)) {
-                logger.info('No User Found', 'Branch Controller: getSingleBranchDetail')
                 let apiResponse = response.generate(true, 'No Detail Found', 404, null)
                 res.send(apiResponse)
             } else {
@@ -89,7 +79,6 @@ let getSingleAppointmentDetail = (req, res) => {
 
 
 let createAppointment = (req,res) => {
-    console.log(req.body)
     let newCategory = new appointmentModel({
         appointment_id:shortid.generate(),
         appointment_date: req.body.appointment_date,
@@ -106,8 +95,6 @@ let createAppointment = (req,res) => {
 
     newCategory.save((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Branch Controller: createBranch', 10)
             let apiResponse = response.generate(true, 'Failed To create new Branch', 500, null)
             res.send(apiResponse)
         } else {
@@ -122,12 +109,9 @@ let deleteAppointment = (req,res) => {
     appointmentModel.findOneAndRemove({'appointment_id':req.params.id})
     .exec((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Branch Controller: deleteBranch', 10)
             let apiResponse = response.generate(true, 'Failed To delete Branch', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
-            logger.info('No Branch Found', 'Branch Controller: deleteBranch')
             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
             res.send(apiResponse)
         } else {
@@ -143,12 +127,9 @@ let updateAppointment = (req,res) => {
     appointmentModel.updateOne({'appointment_id':req.params.id},option,{multi:true})
     .exec((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Branch Controller: branch', 10)
             let apiResponse = response.generate(true, 'Failed To update branch', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
-            logger.info('No Branch Found', 'Branch Controller: branch')
             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
             res.send(apiResponse)
         } else {
@@ -162,7 +143,6 @@ let updateAppointment = (req,res) => {
 let getBillingCustomerAppointment = (req,res) => {
     appointmentModel.findOne({ 'customer_name': (req.params.customer_name).toLowerCase(), 'status': 'pending', 'branch_id': req.params.branch_id }).exec((err, result) => {
         if (err) {
-            console.log(err);
         } else if (check.isEmpty(result)) {
             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
             res.send(apiResponse)

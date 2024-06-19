@@ -23,21 +23,15 @@ let getAllSession = (req,res) => {
     .lean()
     .exec((err,result) => {
         if(err) {
-            console.log(err)
-            logger.error(err.message, 'Session Controller: getAllSession', 10)
             let apiResponse = response.generate(true, 'Failed To Find Session', 500, null)
             res.send(apiResponse)
         }  else if (check.isEmpty(result)) {
-            logger.info('No Data Found', 'Session Controller: getAllSession')
             let apiResponse = response.generate(true, 'No Data Found', 404, null)
             res.send(apiResponse)
         }  else {
             const filteredUsers = result.filter(user => {
-                console.log('here',user)
                 let isValid = true;
                 for (key in filters) {
-                    console.log(filters[key])
-                  console.log('here',user[key])
                   if(key === 'createdOn') {
 
                       isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
@@ -59,12 +53,6 @@ let getAllSession = (req,res) => {
     })
 }
 
-
-let ActiveSession = (req,res) => {
-    sessionModel.find({"branch_id": req.query.branchId,"date": req.query.date})
-}
-
-
 let createSession = (req,res) => {
     let id = shortid.generate();
     let newSession = new sessionModel({
@@ -84,8 +72,6 @@ let createSession = (req,res) => {
 
     newSession.save((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Session Controller: createSession', 10)
             let apiResponse = response.generate(true, 'Failed To create session', 500, null)
             res.send(apiResponse)
         } else {
@@ -106,8 +92,6 @@ let deleteSession = (req,res) => {
     sessionModel.findOneAndRemove({'session_id':req.params.id})
     .exec((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Session Controller: deleteSession', 10)
             let apiResponse = response.generate(true, 'Failed To delete Session', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
@@ -127,12 +111,9 @@ let getSessionDetail = (req, res) => {
         .lean()
         .exec((err, result) => {
             if (err) {
-                console.log(err)
-                logger.error(err.message, 'Session Controller: getSingleSessionDetail', 10)
                 let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
                 res.send(apiResponse)
             } else if (check.isEmpty(result)) {
-                logger.info('No User Found', 'Session Controller: getSingleSessionDetail')
                 let apiResponse = response.generate(true, 'No Detail Found', 404, null)
                 res.send(apiResponse)
             } else {
@@ -145,16 +126,12 @@ let getSessionDetail = (req, res) => {
 
 let updateSession = (req,res) => {
     let option = req.body
-    console.log(option)
     sessionModel.updateOne({'session_id':req.params.id},option,{multi:true})
     .exec((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Session Controller: update', 10)
             let apiResponse = response.generate(true, 'Failed To update Session', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
-            logger.info('No Session Found', 'Session Controller: updateSession')
             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
             res.send(apiResponse)
         } else {
@@ -171,12 +148,9 @@ let getCurrentSession = (req,res) => {
     .lean()
     .exec((err, result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Session Controller: getSingleSessionDetail', 10)
             let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
-            logger.info('No User Found', 'Session Controller: getSingleSessionDetail')
             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
             res.send(apiResponse)
         } else {
@@ -190,11 +164,8 @@ let getCurrentSession = (req,res) => {
 let deactivateAllSession = (req,res) => {
     sessionModel.find({session_status:'true','branch_id': req.params.branch_id}).exec((err,result) => {
         if(err) {
-          console.log(err)
         }else if (check.isEmpty(result)) {
-          console.log('No active session')
         } else {
-          console.log(result)
           for (let item of result) {
             
             let option = {
@@ -203,9 +174,6 @@ let deactivateAllSession = (req,res) => {
       
             sessionModel.updateOne({'session_id':item.session_id},option,{multi:true}).exec((err,result) => {
               if(err) {
-                console.log(err)
-              }else {
-                console.log('updated successfully')
               }
             })
           }

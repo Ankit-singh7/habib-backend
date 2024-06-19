@@ -15,12 +15,9 @@ let getAllService = (req,res) => {
     .select('-__v -_id')
     .exec((err,result) => {
         if(err) {
-            console.log(err)
-            logger.error(err.message, 'Branch Controller: getAllBranch', 10)
             let apiResponse = response.generate(true, 'Failed To Find ', 500, null)
             res.send(apiResponse)
         }  else if (check.isEmpty(result)) {
-            logger.info('No Data Found', 'Branch Controller: getAllBranch')
             let apiResponse = response.generate(true, 'No Data Found', 404, null)
             res.send(apiResponse)
         }  else {
@@ -44,12 +41,9 @@ let getSingleService = (req, res) => {
         .lean()
         .exec((err, result) => {
             if (err) {
-                console.log(err)
-                logger.error(err.message, 'Branch Controller: getSingleBranchDetail', 10)
                 let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
                 res.send(apiResponse)
             } else if (check.isEmpty(result)) {
-                logger.info('No User Found', 'Branch Controller: getSingleBranchDetail')
                 let apiResponse = response.generate(true, 'No Detail Found', 404, null)
                 res.send(apiResponse)
             } else {
@@ -65,12 +59,9 @@ let getActiveService = (req,res) => {
     .lean()
     .exec((err, result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Branch Controller: getSingleBranchDetail', 10)
             let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
-            logger.info('No User Found', 'Branch Controller: getSingleBranchDetail')
             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
             res.send(apiResponse)
         } else {
@@ -84,12 +75,9 @@ let getServiceByCategory = (req,res) => {
     .lean()
     .exec((err, result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Branch Controller: getSingleBranchDetail', 10)
             let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
-            logger.info('No User Found', 'Branch Controller: getSingleBranchDetail')
             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
             res.send(apiResponse)
         } else {
@@ -102,15 +90,12 @@ let getServiceByCategory = (req,res) => {
 
 
 let createService = (req,res) => {
-    console.log(req.body)
-
     let service_type_name;
 
     let findServiceType = () => {
         return new Promise((resolve,reject) => {
             serviceTypeModel.find({'service_type_id': req.body.service_type_id}).exec((err,result) => {
                 if(err) {
-                   console.log(err)
                    reject('service type not found')
                 } else {
                     service_type_name = result[0].name
@@ -134,8 +119,6 @@ let createService = (req,res) => {
         
             newCategory.save((err,result) => {
                 if (err) {
-                    console.log(err)
-                    logger.error(err.message, 'Branch Controller: createBranch', 10)
                     let apiResponse = response.generate(true, 'Failed To create new Branch', 500, null)
                      reject('failed to create service')
                 } else {
@@ -153,8 +136,6 @@ let createService = (req,res) => {
         res.status(200)
         res.send(apiResponse)
        }).catch((err) => {
-        console.log("errorhandler");
-        console.log(err);
         res.status(err.status)
         res.send(err)
     })
@@ -166,12 +147,9 @@ let deleteService = (req,res) => {
     serviceModel.findOneAndRemove({'service_id':req.params.id})
     .exec((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Branch Controller: deleteBranch', 10)
             let apiResponse = response.generate(true, 'Failed To delete Branch', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
-            logger.info('No Branch Found', 'Branch Controller: deleteBranch')
             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
             res.send(apiResponse)
         } else {
@@ -191,7 +169,6 @@ let updateService = (req,res) => {
         return new Promise((resolve,reject) => {
             serviceTypeModel.find({'service_type_id': req.body.service_type_id}).exec((err,result) => {
                 if(err) {
-                   console.log(err)
                    reject('service type not found')
                 } else {
                     service_type_name = result[0].name
@@ -207,12 +184,9 @@ let updateService = (req,res) => {
             serviceModel.updateOne({'service_id':req.params.id},option,{multi:true})
            .exec((err,result) => {
                if (err) {
-                   console.log(err)
-                   logger.error(err.message, 'Branch Controller: branch', 10)
                    let apiResponse = response.generate(true, 'Failed To update branch', 500, null)
                    reject(apiResponse)
                } else if (check.isEmpty(result)) {
-                   logger.info('No Branch Found', 'Branch Controller: branch')
                    let apiResponse = response.generate(true, 'No Detail Found', 404, null)
                    resolve(apiResponse)
                } else {
@@ -230,8 +204,6 @@ let updateService = (req,res) => {
         res.status(200)
         res.send(apiResponse)
        }).catch((err) => {
-        console.log("errorhandler");
-        console.log(err);
         res.status(err.status)
         res.send(err)
     })

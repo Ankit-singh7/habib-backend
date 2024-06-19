@@ -15,12 +15,9 @@ let getAllProduct = (req,res) => {
     .select('-__v -_id')
     .exec((err,result) => {
         if(err) {
-            console.log(err)
-            logger.error(err.message, 'Product Controller: getAllProduct', 10)
             let apiResponse = response.generate(true, 'Failed To Find ', 500, null)
             res.send(apiResponse)
         }  else if (check.isEmpty(result)) {
-            logger.info('No Data Found', 'Product Controller: getAllProduct')
             let apiResponse = response.generate(true, 'No Data Found', 404, null)
             res.send(apiResponse)
         }  else {
@@ -37,16 +34,12 @@ let getAllProduct = (req,res) => {
 
 
 let getActiveProduct = (req, res) => {
-    console.log('inside')
    productModel.find({ 'mostly_used': 'yes' })
         .exec((err, result) => {
             if (err) {
-                console.log(err)
-                logger.error(err.message, 'Product Controller: getSingleProductDetail', 10)
                 let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
                 res.send(apiResponse)
             } else if (check.isEmpty(result)) {
-                logger.info('No User Found', 'Branch Controller: getSingleProductDetail')
                 let apiResponse = response.generate(true, 'No Detail Found', 404, null)
                 res.send(apiResponse)
             } else {
@@ -65,12 +58,9 @@ let getSingleProduct = (req, res) => {
         .lean()
         .exec((err, result) => {
             if (err) {
-                console.log(err)
-                logger.error(err.message, 'Product Controller: getSingleProductDetail', 10)
                 let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
                 res.send(apiResponse)
             } else if (check.isEmpty(result)) {
-                logger.info('No User Found', 'Branch Controller: getSingleProductDetail')
                 let apiResponse = response.generate(true, 'No Detail Found', 404, null)
                 res.send(apiResponse)
             } else {
@@ -89,12 +79,9 @@ let getProductByBrand = (req, res) => {
         .lean()
         .exec((err, result) => {
             if (err) {
-                console.log(err)
-                logger.error(err.message, 'Product Controller: getSingleProductDetail', 10)
                 let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
                 res.send(apiResponse)
             } else if (check.isEmpty(result)) {
-                logger.info('No User Found', 'Branch Controller: getSingleProductDetail')
                 let apiResponse = response.generate(true, 'No Detail Found', 404, null)
                 res.send(apiResponse)
             } else {
@@ -138,8 +125,6 @@ let createProduct = (req,res) => {
         
             newCategory.save((err,result) => {
                 if (err) {
-                    console.log(err)
-                    logger.error(err.message, 'Branch Controller: createProduct', 10)
                     let apiResponse = response.generate(true, 'Failed To create new Product', 500, null)
                     reject('failed to add product')
                 } else {
@@ -157,8 +142,6 @@ let createProduct = (req,res) => {
             res.status(200)
             res.send(apiResponse)
            }).catch((err) => {
-            console.log("errorhandler");
-            console.log(err);
             res.status(err.status)
             res.send(err)
         })
@@ -169,12 +152,9 @@ let deleteProduct = (req,res) => {
     productModel.findOneAndRemove({'product_id':req.params.id})
     .exec((err,result) => {
         if (err) {
-            console.log(err)
-            logger.error(err.message, 'Product Controller: deleteProduct', 10)
             let apiResponse = response.generate(true, 'Failed To delete Product', 500, null)
             res.send(apiResponse)
         } else if (check.isEmpty(result)) {
-            logger.info('No Product Found', 'Product Controller: deleteProduct')
             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
             res.send(apiResponse)
         } else {
@@ -207,12 +187,9 @@ let updateProduct = (req,res) => {
         productModel.updateOne({'product_id':req.params.id},option,{multi:true})
         .exec((err,result) => {
             if (err) {
-                console.log(err)
-                logger.error(err.message, 'Product Controller: branch', 10)
                 let apiResponse = response.generate(true, 'Failed To update Product', 500, null)
                 res.send(apiResponse)
             } else if (check.isEmpty(result)) {
-                logger.info('No Product Found', 'Product Controller: Product')
                 let apiResponse = response.generate(true, 'No Detail Found', 404, null)
                 res.send(apiResponse)
             } else {
@@ -229,8 +206,6 @@ let updateProduct = (req,res) => {
       res.status(200)
       res.send(apiResponse)
      }).catch((err) => {
-      console.log("errorhandler");
-      console.log(err);
       res.status(err.status)
       res.send(err)
   })
