@@ -642,231 +642,186 @@ let getTotalSales = (req, res) => {
 
 let deleteBill = (req, res) => {
     let bill;
+
     let getBillDetail = () => {
-        return new Promise((resolve,reject) => {
-
-            billModel.findOne({ 'bill_id': req.params.id }).exec((billerr,billresult) => {
-                if(billerr){
-                    console.log(billerr)
-                    reject(billerr)
+        return new Promise((resolve, reject) => {
+            billModel.findOne({ 'bill_id': req.params.id }).exec((billerr, billresult) => {
+                if (billerr) {
+                    console.log(billerr);
+                    reject(billerr);
                 } else {
-                    console.log(billresult)
-                    bill = billresult
-                    resolve(bill)
+                    console.log(billresult);
+                    bill = billresult;
+                    resolve(bill);
                 }
-            })
-        })
+            });
+        });
     }
 
-let updateProductSalesReport = () => {
-    return new Promise((resolve,reject) => {
-        if(bill.products.length>0) {
-            
-            console.log('in product')
-                for(let item of bill.products) {
-                
-                    productSalesReportModel.findOne({'date': moment(item.createdOn).format('DD-MM-YYYY'),'product_id': item.product_id,'branch_id':item.branch_id}).exec((err,result) => {
-                        if(err){
-                            console.log(err)
-                        } else if (check.isEmpty(result)) {
-                             console.log('no sales report p')
-                        } else {
-                            console.log(result)
-                            let obj = {
-                               quantity: Number(result.quantity) - Number(item.quantity) 
-                            }
-                            productSalesReportModel.updateOne({'sales_report_id': result.sales_report_id},obj,{multi:true}).exec((err,result) => {
-                                if(err) {
-                                    console.log(err)
-                                } else {
-                                    console.log(result)
-                                }
-                            })
-                        }
-                    })
-                 }
-                 resolve('sales updated')
-            } else {
-                resolve('no products added')
-            }
-        })
-}
-
-let updateServiceSalesReport = () => {
-    
-    return new Promise((resolve,reject) => {
-            if(bill.services.length>0) {
-            for(let item of bill.services) {
-                serviceSalesReportModel.findOne({'date': moment(item.createdOn).format('DD-MM-YYYY'),'service_id': item.service_id,'branch':item.branch}).exec((err,result) => {
-                    if(err){
-                        console.log(err)
-                    } else if (check.isEmpty(result)) {
-                         console.log('no sales report s')
-                    } else {
-                        console.log(result)
-                        let obj = {
-                           quantity: Number(result.quantity) - Number(item.quantity) 
-                        }
-                        serviceSalesReportModel.updateOne({'sales_report_id': result.sales_report_id},obj,{multi:true}).exec((err,result) => {
-                            if(err) {
-                                console.log(err)
+    let updateProductSalesReport = () => {
+        return new Promise((resolve, reject) => {
+            if (bill.products && bill.products.length > 0) {
+                let promises = bill.products.map(item => {
+                    return new Promise((resolve, reject) => {
+                        productSalesReportModel.findOne({
+                            'date': moment(item.createdOn).format('DD-MM-YYYY'),
+                            'product_id': item.product_id,
+                            'branch_id': item.branch_id
+                        }).exec((err, result) => {
+                            if (err) {
+                                console.log(err);
+                                reject(err);
+                            } else if (check.isEmpty(result)) {
+                                console.log('no sales report p');
+                                resolve();
                             } else {
-                                console.log(result)
-                            }
-                        })
-                    }
-                })
-             }
-             resolve('sales updated')
-            } else {
-                resolve('no products added')
-            }
-        })
-}
-
-let updateDrawerBalance = () => {
-        return new Promise((resolve,reject) => {
-            if(bill.payment_mode === 'Cash') {
-
-                sessionModel.findOne({'session_status': 'true','branch_id':bill.branch_id})
-                   .select('-__v -_id')
-                   .lean()
-                   .exec((err, sResult) => {
-                     if (err) {
-                        console.log(err)
-                     } else if (check.isEmpty(sResult)) {
-                        console.log('no active session')
-                     } else {
-
-                         let newObj = {
-                                drawer_balance: Number(sResult.drawer_balance) - Number(bill.total_price),
-                                cash_income: Number(sResult.cash_income) - Number(bill.total_price)
-                             }
-
-                             sessionModel.updateOne({'session_id': sResult.session_id },newObj,{multi:true}).exec((updateErr, updateResult) => {
-                                    if(updateErr){
-                                      console.log(updateErr)
+                                console.log(result);
+                                let obj = {
+                                    quantity: Number(result.quantity) - Number(item.quantity)
+                                };
+                                productSalesReportModel.updateOne({
+                                    'sales_report_id': result.sales_report_id
+                                }, obj, { multi: true }).exec((err, result) => {
+                                    if (err) {
+                                        console.log(err);
+                                        reject(err);
                                     } else {
-                                       resolve(updateResult)
+                                        console.log(result);
+                                        resolve(result);
                                     }
-                             })
-
-                    }
-                  })
+                                });
+                            }
+                        });
+                    });
+                });
+                Promise.all(promises).then(() => {
+                    resolve('sales updated');
+                }).catch(err => {
+                    reject(err);
+                });
             } else {
-                resolve('payment_mode is not Cash')
+                resolve('no products added');
             }
-      })
+        });
     }
 
-    // let updateIGReport_and_stock = () => {
-    //     return new Promise((resolve,reject) => {
-    //         ingredientReportModel.find({'date': moment(bill.createdOn).format('DD-MM-YYYY')}).exec((rErr,report) => {
-    //             if(rErr) {
-    //                 console.log(err);
-    //             } else if(check.isEmpty(report)) {
-    //                 console.log('No data found')
-    //             } else {
-    //                 for(let item of bill.products) {
-    //                     foodIngredientModel.find({ 'sub_category_id': item.food_id }, (Ierr, ingredient) => {
-    //                         if(Ierr) {
-    //                             console.log(Ierr)
-    //                         } else if(check.isEmpty(ingredient)) {
-    //                             console.log('No ingredient Found for this food')
-    //                         } else {
-    //                             console.log('Ingredients Found')
-    //                             console.log(ingredient)
-    //                             for(let i of ingredient) {
-    //                                 for (let ri of report) {
-    //                                     if (ri.ingredient_id === i.ingredient_id) {
-    //                                         ri.quantity_by_order = String(Number(ri.quantity_by_order) - (Number(item.quantity) * Number(i.quantity)))
-    //                                         let data = {
-    //                                             quantity_by_order: ri.quantity_by_order
-    //                                         }
-    //                                         ingredientReportModel.updateOne({ 'date': time.getNormalTime(), 'ingredient_id': ri.ingredient_id }, data, { multi: true }).exec((err, response) => {
-    //                                             if (err) {
-    //                                                 console.log(err)
-    //                                             } else {
-    //                                                 console.log(response)
-    //                                                 console.log('IG Report Successfully updated')
-    //                                                 // Updating Stocks
-    //                                                 ingredientModel.find({ ingredient_id: ri.ingredient_id }).exec((err, result) => {
-    //                                                     if (err) {
-    //                                                         console.log(err)
-    //                                                     } else {
-    //                                                         let quantity2 = Number(item.quantity) * Number(i.quantity)
-    //                                                         let stock = result[0].stock
-    //                                                         const option = {
-    //                                                             stock: stock + Number(quantity2)
-    //                                                         }
-    //                                                         ingredientModel.updateOne({ ingredient_id: ri.ingredient_id }, option, { multi: true }).exec((err, result) => {
-    //                                                             if (err) {
-    //                                                                 console.log(err)
-    //                                                             } else {
-    //                                                                 console.log('stock updated successfully')
-    //                                                                 console.log(result)
-    //                                                             }
-    //                                                         })
-    //                                                     }
-    //                                                 })
-    //                                             }
-    //                                         })
-                                  
-    //                                     }
-    //                                 }
-    //                             }
+    let updateServiceSalesReport = () => {
+        return new Promise((resolve, reject) => {
+            if (bill.services && bill.services.length > 0) {
+                let promises = bill.services.map(item => {
+                    return new Promise((resolve, reject) => {
+                        serviceSalesReportModel.findOne({
+                            'date': moment(item.createdOn).format('DD-MM-YYYY'),
+                            'service_id': item.service_id,
+                            'branch': item.branch
+                        }).exec((err, result) => {
+                            if (err) {
+                                console.log(err);
+                                reject(err);
+                            } else if (check.isEmpty(result)) {
+                                console.log('no sales report s');
+                                resolve();
+                            } else {
+                                console.log(result);
+                                let obj = {
+                                    quantity: Number(result.quantity) - Number(item.quantity)
+                                };
+                                serviceSalesReportModel.updateOne({
+                                    'sales_report_id': result.sales_report_id
+                                }, obj, { multi: true }).exec((err, result) => {
+                                    if (err) {
+                                        console.log(err);
+                                        reject(err);
+                                    } else {
+                                        console.log(result);
+                                        resolve(result);
+                                    }
+                                });
+                            }
+                        });
+                    });
+                });
+                Promise.all(promises).then(() => {
+                    resolve('sales updated');
+                }).catch(err => {
+                    reject(err);
+                });
+            } else {
+                resolve('no services added');
+            }
+        });
+    }
 
-    //                         }
-    //                     })
-    //                     resolve('report and stock updated')
-    //                 }
-    //             }
-    //         })
-    //     })
-    // }
+    let updateDrawerBalance = () => {
+        return new Promise((resolve, reject) => {
+            if (bill.payment_mode === 'Cash') {
+                sessionModel.findOne({
+                    'session_status': 'true',
+                    'branch_id': bill.branch_id
+                }).select('-__v -_id').lean().exec((err, sResult) => {
+                    if (err) {
+                        console.log(err);
+                        reject(err);
+                    } else if (check.isEmpty(sResult)) {
+                        console.log('no active session');
+                        resolve('no active session');
+                    } else {
+                        let newObj = {
+                            drawer_balance: Number(sResult.drawer_balance) - Number(bill.total_price),
+                            cash_income: Number(sResult.cash_income) - Number(bill.total_price)
+                        };
+                        sessionModel.updateOne({
+                            'session_id': sResult.session_id
+                        }, newObj, { multi: true }).exec((updateErr, updateResult) => {
+                            if (updateErr) {
+                                console.log(updateErr);
+                                reject(updateErr);
+                            } else {
+                                resolve(updateResult);
+                            }
+                        });
+                    }
+                });
+            } else {
+                resolve('payment_mode is not Cash');
+            }
+        });
+    }
 
-
-    let deleteBill = () => {
-        return new Promise((resolve,reject) => {
-            billModel.findOneAndRemove({ 'bill_id': req.params.id })
-            .exec((err, result) => {
+    let deleteBillFromDB = () => {
+        return new Promise((resolve, reject) => {
+            billModel.findOneAndRemove({ 'bill_id': req.params.id }).exec((err, result) => {
                 if (err) {
-                    console.log(err)
-                    logger.error(err.message, 'Bill Controller: deleteBill', 10)
-                    let apiResponse = response.generate(true, 'Failed To delete Bill', 500, null)
-                    reject('Failed To delete Bill')
+                    console.log(err);
+                    logger.error(err.message, 'Bill Controller: deleteBill', 10);
+                    let apiResponse = response.generate(true, 'Failed To delete Bill', 500, null);
+                    reject(apiResponse);
                 } else if (check.isEmpty(result)) {
-                    logger.info('No Bill Found', 'Bill Controller: deleteBill')
-                    let apiResponse = response.generate(true, 'No Detail Found', 404, null)
-                      reject('No Detail Found')
+                    logger.info('No Bill Found', 'Bill Controller: deleteBill');
+                    let apiResponse = response.generate(true, 'No Detail Found', 404, null);
+                    reject(apiResponse);
                 } else {
-                    let apiResponse = response.generate(false, 'Bill Successfully deleted', 200, result)
-                    res.send(apiResponse)
-                    resolve('Bill Successfully deleted')
+                    let apiResponse = response.generate(false, 'Bill Successfully deleted', 200, result);
+                    resolve(apiResponse);
                 }
-            })
-        })
+            });
+        });
     }
 
-    getBillDetail(req,res)
-       .then(updateProductSalesReport)
-       .then(updateServiceSalesReport)
-       .then(updateDrawerBalance)
-       .then(deleteBill)
-       .then((resolve) => {
-        let apiResponse = response.generate(false, 'Bill Deleted Successfully', 200, resolve)
-        res.status(200)
-        res.send(apiResponse)
-       }).catch((err) => {
-        console.log("errorhandler");
-        console.log(err);
-        res.status(err.status)
-        res.send(err)
-    })
- 
-
-
+    getBillDetail()
+        .then(updateProductSalesReport)
+        .then(updateServiceSalesReport)
+        .then(updateDrawerBalance)
+        .then(deleteBillFromDB)
+        .then((apiResponse) => {
+            res.status(200).send(apiResponse);
+        }).catch((err) => {
+            console.log("errorhandler");
+            console.log(err);
+            res.status(err.status || 500).send(err);
+        });
 }
+
 
 let changeStatus = (req, res) => {
     let option = req.body
