@@ -9,6 +9,14 @@ let appointmentSchema = new Schema(
                     index: true,
                     unique: true
                 },
+                employee_id: {
+                    type: String,
+                    default: ''
+                },
+                employee_name: {
+                    type: String,
+                    default: ''
+                },
                 appointment_date: {
                     type: String,
                     default: ''
@@ -44,6 +52,10 @@ let appointmentSchema = new Schema(
                 status:{
                     type: String,
                     default:'pending'
+                },
+                phone_number: { 
+                    type: String,
+                    default: ''
                 },
                 createdOn: {
                     type: Date

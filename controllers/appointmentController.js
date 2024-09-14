@@ -90,6 +90,9 @@ let createAppointment = (req,res) => {
         payment_mode: req.body.payment_mode,
         booking_amount: req.body.booking_amount,
         status: 'pending',
+        phone_number: req.body.phone_number,
+        employee_id: req.body.employee_id,
+        employee_name: req.body.employee_name,
         createdOn: time.now()
     })
 
