@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
+const productDetail  = {
+    type: String
+}
+
 let billSchema = new Schema(
     {
 
@@ -135,7 +139,23 @@ let billSchema = new Schema(
                 total:{
                     type:Number,
                     default:null
-                }
+                },
+                product_usage_detail: [
+                    {
+                        name: {
+                            type: String,
+                            default: ''
+                        },
+                        product_id: {
+                            type: String,
+                            default: ''
+                        },
+                        quantity: {
+                            type: String,
+                            default: null
+                        }
+                    }
+                ]
              } 
         ],
         date:{

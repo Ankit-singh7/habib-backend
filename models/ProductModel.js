@@ -38,6 +38,10 @@ let productSchema = new Schema(
     type: Number,
     default: null   
  },
+ unit: {
+   type: String,
+   default: '',
+ },
  createdOn :{
    type:Date,
    default:""
