@@ -17,14 +17,18 @@ let employeeExpenseSchema = new Schema(
    type: String,
    default: ''
  },
- expense_reason: {
-  type: String,
-  default: ''
- },
- expense_amount: {
-  type: String,
-  default: ''
- },
+ expenses : [
+  {
+    expense_reason: {
+      type: String,
+      default: ''
+    },
+    expense_amount: {
+      type: String,
+      default: ''
+    }
+  }
+],
  branch_id: {
   type: String,
   default: ''

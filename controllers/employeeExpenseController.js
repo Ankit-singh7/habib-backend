@@ -146,8 +146,7 @@ let createEmployeeExpense = (req,res) => {
         expense_id: shortid.generate(),
         employee_id: req.body.employee_id,
         employee_name: req.body.employee_name,
-        expense_reason: req.body.expense_reason,
-        expense_amount: req.body.expense_amount,
+        expenses: req.body.expenses,
         branch_id: req.body.branch_id,
         branch_name: req.body.branch_name,
         createdOn: truncatedDate
