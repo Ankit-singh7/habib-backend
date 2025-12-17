@@ -45,6 +45,10 @@ const sessionSchema = new Schema({
     type:Number,
     default: 0
   },
+  expense_drawer_balance: {
+    type:Number,
+    default: 0
+  },
   closing_balance: {
     type:Number,
     default: 0

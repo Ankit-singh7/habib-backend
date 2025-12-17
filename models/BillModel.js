@@ -42,6 +42,18 @@ let billSchema = new Schema(
             type: String,
             default:''
         },
+        dob: {
+            type:String,
+            default:''
+        },
+        feedback: {
+            type:String,
+            default:''
+        },
+        anniversary: {
+            type:String,
+            default:''
+        },
         dual_payment_mode:{
             type:String,
             default:''

@@ -381,6 +381,9 @@ let createBill = (req, res) => {
         services: req.body.services,
         branch_id: req.body.branch_id,
         branch_name: req.body.branch_name,
+        dob: req.body.dob,
+        anniversary: req.body.anniversary,
+        feedback: req.body.feedback,
         date: time.getNormalTime(),
         createdOn: time.now()
     })
@@ -406,6 +409,9 @@ let createBill = (req, res) => {
             services: req.body.services,
             branch_id: req.body.branch_id,
             branch_name: req.body.branch_name,
+            dob: req.body.dob,
+            anniversary: req.body.anniversary,
+            feedback: req.body.feedback,
             date: time.getNormalTime(),
             createdOn: time.now()
         })
