@@ -165,6 +165,10 @@ let billSchema = new Schema(
                         quantity: {
                             type: String,
                             default: null
+                        },
+                        brand_id: {
+                            type: String,
+                            default: ''
                         }
                     }
                 ]
