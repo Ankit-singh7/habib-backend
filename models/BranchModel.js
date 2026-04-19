@@ -60,5 +60,5 @@ let branchSchema = new Schema(
  }, 
 })
 
-
+branchSchema.index({ branch_id: 1 });
 mongoose.model('branch', branchSchema);

@@ -50,11 +50,15 @@ let userSchema = new Schema(
      type:String,
      default:''
  },
+ shift: {
+    type: String,
+    default: 'Morning'
+ },
  createdOn :{
    type:Date,
    default:""
  }, 
 })
 
-
+userSchema.index({ branch_id: 1, role: 1, status: 1 });
 mongoose.model('user', userSchema);
