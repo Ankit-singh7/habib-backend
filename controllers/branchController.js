@@ -112,7 +112,7 @@ let deleteBranch = (req,res) => {
 
 let updateBranch = (req,res) => {
     let option = req.body
-    branchModel.updateOne({'branch_id':req.params.id},option,{multi:true})
+    branchModel.updateOne({'branch_id':req.params.id},{ $set: option },{multi:true})
     .exec((err,result) => {
         if (err) {
             let apiResponse = response.generate(true, 'Failed To update branch', 500, null)

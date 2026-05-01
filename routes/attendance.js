@@ -11,4 +11,6 @@ module.exports.setRouter = (app) => {
 
     app.get(`${baseUrl}/attendance/list/:employeeId`, attendanceController.getAttendanceList);
 
+    app.get(`${baseUrl}/locations`, attendanceController.getBranchesWithLocation);
+
 }

@@ -9,6 +9,18 @@ const Branch = mongoose.model('branch');
 const BranchHistory = mongoose.model('branch_history');
 const Fine = mongoose.model('employee_fine');
 const OperatorActivity = mongoose.model('operator_activity');
+const Deduction = mongoose.model('deduction'); 
+
+
+const calculateDeduction = (lateMinutes, rules = []) => {
+  let deduction = 0;
+  for (let rule of rules) {
+    if (lateMinutes >= rule.late_minutes) {
+      deduction = rule.deduction;
+    }
+  }
+  return deduction;
+};
 
 const getOperatorDashboard = async (operatorId) => {
 
@@ -112,81 +124,119 @@ const getEmployeeListWithStatus = async () => {
 };
 
 const operatorPunch = async (employee_id, operator_id) => {
+  const now = new Date();
+  const attendance_date = moment(now).format('YYYY-MM-DD');
 
-    const now = new Date();
+  // ✅ Find today's record (not by is_active — by date)
+  let record = await Attendance.findOne({ employee_id, attendance_date });
 
-    const existing = await Attendance.findOne({
-        employee_id,
-        is_active: true
+  // ============================================
+  // 👉 FIRST PUNCH IN OF THE DAY
+  // ============================================
+  if (!record) {
+    const shiftStart = moment(now).startOf('day').add(9, 'hours');
+    const actualIn = moment(now);
+
+    let lateMinutes = 0;
+    if (actualIn.isAfter(shiftStart)) {
+      lateMinutes = actualIn.diff(shiftStart, 'minutes');
+    }
+
+    const deductionConfig = await Deduction.findOne({});
+    const deductionAmount = calculateDeduction(
+      lateMinutes,
+      deductionConfig?.rules || []
+    );
+
+    record = new Attendance({
+      attendance_id: new mongoose.Types.ObjectId().toString(),
+      employee_id,
+      attendance_date,
+      sessions: [{ punch_in: now, punch_out: null, duration: 0 }],
+      total_hours: 0,
+      status: 'PRESENT',
+      late_minutes: lateMinutes,
+      deduction_amount: deductionAmount,
+      is_active: true,
+      punch_by: 'OPERATOR',
+      operator_id,
     });
 
-    // 🔥 PUNCH IN
-    if (!existing) {
+    await record.save();
 
-        const attendance_date = moment(now).format('YYYY-MM-DD');
+    await logActivity({
+      operator_id,
+      action_type: 'PUNCH',
+      target_employee_id: employee_id,
+      metadata: { type: 'PUNCH_IN', time: now }
+    });
 
-        const newAttendance = new Attendance({
-            attendance_id: new mongoose.Types.ObjectId().toString(),
-            employee_id,
-            attendance_date,
-            punch_in_time: now,
-            is_active: true,
-            punch_by: 'OPERATOR',
-            operator_id
-        });
+    return { type: 'PUNCH_IN', message: 'Punch In successful' };
+  }
 
-        await newAttendance.save();
+  // ============================================
+  // 👉 PUNCH OUT — close active session
+  // ============================================
+  if (record.is_active) {
+    const activeSession = record.sessions
+      .slice()
+      .reverse()
+      .find((s) => s.punch_in && !s.punch_out);
 
-        await logActivity({
-            operator_id, // pass from API
-            action_type: 'PUNCH',
-            target_employee_id: employee_id,
-            metadata: {
-                type: existing ? 'PUNCH_OUT' : 'PUNCH_IN',
-                time: new Date()
-            }
-        });
-
-        return {
-            type: 'PUNCH_IN',
-            message: 'Punch In successful'
-        };
+    if (activeSession) {
+      const duration = Math.floor(
+        (now.getTime() - new Date(activeSession.punch_in).getTime()) / (1000 * 60)
+      );
+      activeSession.punch_out = now;
+      activeSession.duration = duration;
     }
 
-    // 🔥 PUNCH OUT
-    else {
+    // ✅ Recalculate total across all sessions
+    const totalMinutes = record.sessions.reduce(
+      (sum, s) => sum + (s.duration || 0), 0
+    );
 
-        const punchOutTime = now;
+    record.total_hours = totalMinutes;
+    record.is_active = false;
+    record.punch_by = 'OPERATOR';
+    record.operator_id = operator_id;
+    record.updated_at = now;
 
-        const totalMinutes = Math.floor(
-            (punchOutTime - existing.punch_in_time) / (1000 * 60)
-        );
+    await record.save();
 
-        existing.punch_out_time = punchOutTime;
-        existing.total_hours = totalMinutes;
-        existing.is_active = false;
-        existing.updated_at = new Date();
-        existing.punch_by = 'OPERATOR';
-        existing.operator_id = operator_id;
+    await logActivity({
+      operator_id,
+      action_type: 'PUNCH',
+      target_employee_id: employee_id,
+      metadata: { type: 'PUNCH_OUT', time: now }
+    });
 
-        await existing.save();
+    return {
+      type: 'PUNCH_OUT',
+      message: 'Punch Out successful',
+      total_hours: totalMinutes
+    };
+  }
 
-        await logActivity({
-            operator_id, // pass from API
-            action_type: 'PUNCH',
-            target_employee_id: employee_id,
-            metadata: {
-                type: existing ? 'PUNCH_OUT' : 'PUNCH_IN',
-                time: new Date()
-            }
-        });
+  // ============================================
+  // 👉 SUBSEQUENT PUNCH IN — add new session
+  // ============================================
+  record.sessions.push({ punch_in: now, punch_out: null, duration: 0 });
+  record.is_active = true;
+  record.punch_by = 'OPERATOR';
+  record.operator_id = operator_id;
+  record.updated_at = now;
 
-        return {
-            type: 'PUNCH_OUT',
-            message: 'Punch Out successful',
-            total_hours: totalMinutes
-        };
-    }
+  await record.save();
+
+  await logActivity({
+    operator_id,
+    action_type: 'PUNCH',
+    target_employee_id: employee_id,
+    metadata: { type: 'PUNCH_IN', time: now }
+  });
+
+  return { type: 'PUNCH_IN', message: 'Punch In successful' };
 };
 
 const changeShift = async (employee_id, new_shift, operator_id) => {
@@ -395,77 +445,92 @@ const getRecentActivity = async (operator_id) => {
 };
 
 const getAttendanceControl = async (branch_id) => {
+  const today = moment().format('YYYY-MM-DD');
 
-    const today = moment().format('YYYY-MM-DD');
+  const query = {
+    status: 'Active',
+    ...(branch_id && { branch_id })
+  };
 
-    // 🔥 FIXED QUERY
-    const query = {
-        status: 'Active',
-        ...(branch_id && { branch_id }) // ✅ correct placement
-    };
+  const employees = await User.find(
+    query,
+    { user_id: 1, f_name: 1, l_name: 1, designation: 1, branch_name: 1 }
+  );
 
-    // 🔹 Step 1: Get all active employees (with optional branch filter)
-    const employees = await User.find(
-        query,
-        { user_id: 1, f_name: 1, l_name: 1, designation: 1, branch_name: 1 }
-    );
+  const employeeIds = employees.map(e => e.user_id);
 
-    const employeeIds = employees.map(e => e.user_id);
+  const attendance = await Attendance.find({
+    employee_id: { $in: employeeIds },
+    attendance_date: today
+  });
 
-    // 🔹 Step 2: Get today's attendance
-    const attendance = await Attendance.find({
-        employee_id: { $in: employeeIds },
-        attendance_date: today
-    });
+  const attendanceMap = {};
+  attendance.forEach(a => { attendanceMap[a.employee_id] = a; });
 
-    // 🔹 Map attendance
-    const attendanceMap = {};
-    attendance.forEach(a => {
-        attendanceMap[a.employee_id] = a;
-    });
+  let present = 0;
+  let absent = 0;
+  let late = 0;
 
-    let present = 0;
-    let absent = 0;
-    let late = 0;
+  const result = employees.map(emp => {
+    const record = attendanceMap[emp.user_id];
 
-    const result = employees.map(emp => {
+    let status = 'ABSENT';
+    let punch_in = null;
+    let punch_out = null;
+    let total_hours = 0;
+    let sessionCount = 0;
 
-        const record = attendanceMap[emp.user_id];
+    if (record) {
+      const sessions = record.sessions || [];
+      sessionCount = sessions.length;
 
-        let status = 'ABSENT';
+      // ✅ First punch in of the day
+      punch_in = sessions[0]?.punch_in || null;
 
-        if (record) {
-            if (record.is_active) {
-                status = 'IN';
-            } else {
-                status = 'OUT';
-            }
+      // ✅ Last completed punch out
+      const completedSessions = sessions.filter((s) => s.punch_out);
+      punch_out = completedSessions[completedSessions.length - 1]?.punch_out || null;
 
-            if (record.late_minutes > 0) {
-                status = 'LATE';
-                late++;
-            } else {
-                present++;
-            }
-        } else {
-            absent++;
-        }
+      // ✅ Total hours across all sessions
+      total_hours = record.total_hours || 0;
 
-        return {
-            employee_id: emp.user_id,
-            name: `${emp.f_name} ${emp.l_name}`,
-            designation: emp.designation,
-            branch: emp.branch_name,
-            status,
-            punch_in: record?.punch_in_time || null,
-            punch_out: record?.punch_out_time || null
-        };
-    });
+      // ✅ Status based on is_active
+      if (record.is_active) {
+        status = 'IN';
+      } else if (sessions.length > 0) {
+        status = 'OUT';
+      }
+
+      // ✅ Late overrides IN/OUT status
+      if (record.late_minutes > 0) {
+        status = status === 'IN' ? 'IN' : 'LATE'; // ✅ keep IN if active, else LATE
+        late++;
+        present++;
+      } else {
+        present++;
+      }
+
+    } else {
+      absent++;
+    }
 
     return {
-        summary: { present, absent, late },
-        employees: result
+      employee_id: emp.user_id,
+      name: `${emp.f_name} ${emp.l_name}`,
+      designation: emp.designation,
+      branch: emp.branch_name,
+      status,
+      punch_in,
+      punch_out,
+      total_hours,
+      session_count: sessionCount
     };
+  });
+
+  return {
+    summary: { present, absent, late },
+    employees: result
+  };
 };
 
 const getOperatorProfile = async (operator_id) => {

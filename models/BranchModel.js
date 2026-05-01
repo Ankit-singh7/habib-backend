@@ -57,7 +57,15 @@ let branchSchema = new Schema(
  createdOn :{
    type:Date,
    default:""
- }, 
+ },
+ latitude: {
+  type: Number,
+  default: 0
+ },
+ longitude: {
+  type: Number,
+  default: 0
+ },
 })
 
 branchSchema.index({ branch_id: 1 });

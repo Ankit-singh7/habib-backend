@@ -21,6 +21,8 @@ module.exports.setRouter = (app) => {
 
     app.post(`${baseUrl}/login`, userController.loginFunction)
 
+    app.post(`${baseUrl}/login-shiftly`, userController.loginFunctionForShiftly)
+
     app.delete(`${baseUrl}/:id`, userController.deleteUser);
 
     app.put(`${baseUrl}/:id`, userController.editUser);

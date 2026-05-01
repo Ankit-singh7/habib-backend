@@ -68,3 +68,21 @@ exports.getAttendanceList = async (req, res) => {
     });
   }
 };
+
+
+exports.getBranchesWithLocation = async (req, res) => {
+  try {
+    const result = await attendanceService.getBranchesWithLocation();
+
+    res.status(200).send({
+      error: false,
+      data: result
+    });
+
+  } catch (err) {
+    res.status(500).send({
+      error: true,
+      message: err.message
+    });
+  }
+};

@@ -4,176 +4,182 @@ const moment = require('moment');
 const Attendance = mongoose.model('attendance');
 const Deduction = mongoose.model('deduction');
 
-// 🔥 Utility: calculate deduction
 const calculateDeduction = (lateMinutes, rules = []) => {
   let deduction = 0;
-
   for (let rule of rules) {
     if (lateMinutes >= rule.late_minutes) {
       deduction = rule.deduction;
     }
   }
-
   return deduction;
 };
 
-// 🔥 Punch In / Punch Out
+// ============================================
+// 🔥 PUNCH IN / PUNCH OUT
+// ============================================
 const punch = async (employee_id, branch_id) => {
   const now = new Date();
+  const attendance_date = moment(now).format('YYYY-MM-DD');
 
-  // Check active record
-  const existing = await Attendance.findOne({
-    employee_id,
-    is_active: true
-  });
+  // ✅ Find today's record
+  let record = await Attendance.findOne({ employee_id, attendance_date });
 
-  // 👉 PUNCH IN
-  if (!existing) {
-    const attendance_date = moment(now).format('YYYY-MM-DD');
-
-    const shiftStart = moment(now).startOf('day').add(9, 'hours'); // 9 AM
+  // ============================================
+  // 👉 FIRST PUNCH IN OF THE DAY — create record
+  // ============================================
+  if (!record) {
+    const shiftStart = moment(now).startOf('day').add(9, 'hours');
     const actualIn = moment(now);
 
     let lateMinutes = 0;
-
     if (actualIn.isAfter(shiftStart)) {
       lateMinutes = actualIn.diff(shiftStart, 'minutes');
     }
 
-    // 🔥 Fetch deduction rules
     const deductionConfig = await Deduction.findOne({});
-
     const deductionAmount = calculateDeduction(
       lateMinutes,
       deductionConfig?.rules || []
     );
 
-    const newAttendance = new Attendance({
+    record = new Attendance({
       attendance_id: new mongoose.Types.ObjectId().toString(),
       employee_id,
       branch_id,
       attendance_date,
-      punch_in_time: now,
-      late_minutes: lateMinutes,          // ✅ NOW SET
-      deduction_amount: deductionAmount,  // ✅ NOW SET
-      is_active: true
+      sessions: [{ punch_in: now, punch_out: null, duration: 0 }],
+      total_hours: 0,
+      status: 'PRESENT',
+      late_minutes: lateMinutes,
+      deduction_amount: deductionAmount,
+      is_active: true,  // currently punched in
     });
 
-    await newAttendance.save();
+    await record.save();
 
-    return {
-      type: 'PUNCH_IN',
-      message: 'Punch In successful'
-    };
+    return { type: 'PUNCH_IN', message: 'Punch In successful' };
   }
 
-  // 👉 PUNCH OUT
-  else {
-    const punchOutTime = now;
+  // ============================================
+  // 👉 PUNCH OUT — close the active session
+  // ============================================
+  if (record.is_active) {
+    // Find the last session that has no punch_out
+    const activeSession = record.sessions
+      .slice()
+      .reverse()
+      .find(s => s.punch_in && !s.punch_out);
 
-    const totalMinutes = Math.floor(
-      (punchOutTime - existing.punch_in_time) / (1000 * 60)
-    );
-
-    // 🔥 Late calculation (assume 10 AM shift)
-    const shiftStart = moment(existing.punch_in_time)
-      .startOf('day')
-      .add(10, 'hours');
-
-    const actualIn = moment(existing.punch_in_time);
-
-    let lateMinutes = 0;
-    if (actualIn.isAfter(shiftStart)) {
-      lateMinutes = actualIn.diff(shiftStart, 'minutes');
+    if (activeSession) {
+      const duration = Math.floor(
+        (now - new Date(activeSession.punch_in)) / (1000 * 60)
+      );
+      activeSession.punch_out = now;
+      activeSession.duration = duration;
     }
 
-    // 🔥 Fetch deduction rules
-    const deductionConfig = await Deduction.findOne({});
-
-    const deductionAmount = calculateDeduction(
-      lateMinutes,
-      deductionConfig?.rules || []
+    // ✅ Recalculate total minutes across ALL sessions
+    const totalMinutes = record.sessions.reduce(
+      (sum, s) => sum + (s.duration || 0), 0
     );
 
-    existing.punch_out_time = punchOutTime;
-    existing.total_hours = totalMinutes;
-    existing.late_minutes = lateMinutes;
-    existing.deduction_amount = deductionAmount;
-    existing.is_active = false;
-    existing.updated_at = new Date();
+    record.total_hours = totalMinutes;
+    record.is_active = false;
+    record.updated_at = new Date();
 
-    await existing.save();
+    await record.save();
 
     return {
       type: 'PUNCH_OUT',
       message: 'Punch Out successful',
-      total_hours: totalMinutes,
-      deduction: deductionAmount
+      total_hours: totalMinutes
     };
   }
+
+  // ============================================
+  // 👉 SUBSEQUENT PUNCH IN — add new session
+  // ============================================
+  record.sessions.push({ punch_in: now, punch_out: null, duration: 0 });
+  record.is_active = true;
+  record.updated_at = new Date();
+
+  await record.save();
+
+  return { type: 'PUNCH_IN', message: 'Punch In successful' };
 };
 
-// 🔥 Dashboard Data
+// ============================================
+// 🔥 DASHBOARD
+// ============================================
 const getDashboard = async (employee_id) => {
   const today = moment().format('YYYY-MM-DD');
+  const start = moment().startOf('month').format('YYYY-MM-DD');
 
   const todayAttendance = await Attendance.findOne({
     employee_id,
     attendance_date: today
   });
 
-  const start = moment().startOf('month').format('YYYY-MM-DD');
-
   const records = await Attendance.find({
     employee_id,
     attendance_date: { $gte: start, $lte: today }
   });
 
-  // 🔥 Map records
+  // ✅ Build date map of records
   const recordMap = {};
-  records.forEach(r => {
-    recordMap[r.attendance_date] = r;
-  });
+  records.forEach(r => { recordMap[r.attendance_date] = r; });
 
   let current = moment(start);
   const todayMoment = moment();
 
   let totalMinutes = 0;
   let present = 0;
-  let missingDays = 0;
+  let absent = 0;
 
-  while (current <= todayMoment) {
+  while (current.isSameOrBefore(todayMoment, 'day')) {
     const dateStr = current.format('YYYY-MM-DD');
+    const isWeekend = current.day() === 0; // ✅ skip Sundays (optional)
 
-    if (recordMap[dateStr]) {
-      const r = recordMap[dateStr];
-      totalMinutes += r.total_hours || 0;
-      present++;
-    } else {
-      missingDays++;
+    if (!isWeekend) {
+      if (recordMap[dateStr]) {
+        totalMinutes += recordMap[dateStr].total_hours || 0;
+        present++;
+      } else {
+        // ✅ Only count as absent if day has passed
+        if (current.isBefore(todayMoment, 'day')) {
+          absent++;
+        }
+      }
     }
 
     current.add(1, 'day');
   }
 
+  // ✅ Get last session for display
+  const sessions = todayAttendance?.sessions || [];
+  const lastSession = sessions[sessions.length - 1] || null;
+
   return {
-    today: {
-      punch_in: todayAttendance?.punch_in_time || null,
-      punch_out: todayAttendance?.punch_out_time || null,
-      total_hours: todayAttendance?.total_hours || 0,
-      late_minutes: todayAttendance?.late_minutes || 0,
-      deduction: todayAttendance?.deduction_amount || 0,
-      status: todayAttendance?.is_active ? 'Active' : 'Completed'
-    },
+    today: todayAttendance ? {
+      punch_in: lastSession?.punch_in || null,
+      punch_out: lastSession?.punch_out || null,
+      total_hours: todayAttendance.total_hours || 0,
+      late_minutes: todayAttendance.late_minutes || 0,
+      deduction: todayAttendance.deduction_amount || 0,
+      status: todayAttendance.is_active ? 'Active' : 'Completed',
+      sessions: sessions  // ✅ send all sessions if needed for history
+    } : null,
     summary: {
       hours: totalMinutes,
       present,
-      absent: missingDays // ✅ now correct base logic
+      absent
     }
   };
 };
 
-// 🔥 Attendance List
+// ============================================
+// 🔥 ATTENDANCE LIST
+// ============================================
 const getAttendanceList = async (employee_id, month, year) => {
   const start = moment(`${year}-${month}-01`).startOf('month').format('YYYY-MM-DD');
   const end = moment(start).endOf('month').format('YYYY-MM-DD');
@@ -185,15 +191,24 @@ const getAttendanceList = async (employee_id, month, year) => {
 
   return records.map((r) => ({
     date: r.attendance_date,
-    in: r.punch_in_time,
-    out: r.punch_out_time,
-    hours: r.total_hours,
-    status: r.status
-  })); 
+    sessions: r.sessions,          // ✅ all sessions
+    total_hours: r.total_hours,    // ✅ total for the day
+    status: r.status,
+    late_minutes: r.late_minutes,
+    deduction: r.deduction_amount
+  }));
 };
 
-module.exports = {
-  punch,
-  getDashboard,
-  getAttendanceList
+
+const getBranchesWithLocation = async () => {
+  const Branch = mongoose.model('branch');
+  
+  const branches = await Branch.find(
+    { latitude: { $ne: 0 }, longitude: { $ne: 0 } }, // ✅ only branches with coordinates
+    { branch_id: 1, branch_name: 1, latitude: 1, longitude: 1 }
+  );
+
+  return branches;
 };
+
+module.exports = { punch, getDashboard, getAttendanceList, getBranchesWithLocation };

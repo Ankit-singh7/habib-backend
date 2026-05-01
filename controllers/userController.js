@@ -447,6 +447,68 @@ let loginFunction = (req, res) => {
         })
 }
 
+let loginFunctionForShiftly = (req, res) => {
+
+    let findUser = () => {
+        return new Promise((resolve, reject) => {
+
+            const { email, role } = req.body;
+
+            if (!email || !role) {
+                return reject(response.generate(true, 'Email or Role missing', 400, null));
+            }
+
+            // 🔥 Role-based lookup
+            UserModel.findOne({ email: email, role: role.toLowerCase() }, (err, userDetails) => {
+
+                if (err) {
+                    let apiResponse = response.generate(true, 'Failed To Find User Details', 500, null);
+                    reject(apiResponse);
+
+                } else if (check.isEmpty(userDetails)) {
+                    let apiResponse = response.generate(
+                        true,
+                        `No ${role} found with this email`,
+                        404,
+                        null
+                    );
+                    reject(apiResponse);
+
+                } else {
+                    resolve(userDetails);
+                }
+            });
+        });
+    };
+
+    let validatePassword = (retrievedUserDetails) => {
+        return new Promise((resolve, reject) => {
+
+            if (req.body.password === retrievedUserDetails.password) {
+                resolve(retrievedUserDetails);
+
+            } else {
+                let apiResponse = response.generate(true, 'Invalid password', 400, null);
+                reject(apiResponse);
+            }
+        });
+    };
+
+    findUser()
+        .then(validatePassword)
+        .then((user) => {
+
+            // 🔥 Optional: attach auth token (recommended)
+            // let authToken = token.generateToken(user);
+
+            let apiResponse = response.generate(false, 'Login Successful', 200, user);
+
+            res.status(200).send(apiResponse);
+        })
+        .catch((err) => {
+            res.status(err.status || 500).send(err);
+        });
+};
 
 
 // end of the login function 
@@ -600,5 +662,7 @@ module.exports = {
     forgotPasswordFunction: forgotPasswordFunction,
     loginFunction: loginFunction,
     logout: logout,
-    sendEmail: sendEmail
+    sendEmail: sendEmail,
+    loginFunctionForShiftly: loginFunctionForShiftly
+
 }// end exports
