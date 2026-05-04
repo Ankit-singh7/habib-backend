@@ -13,4 +13,6 @@ module.exports.setRouter = (app) => {
 
     app.get(`${baseUrl}/locations`, attendanceController.getBranchesWithLocation);
 
+    app.get(`${baseUrl}/employee/payroll/:employee_id`, attendanceController.getEmployeePayroll);
+
 }

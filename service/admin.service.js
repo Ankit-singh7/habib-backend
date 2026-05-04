@@ -6,104 +6,119 @@ const Attendance = mongoose.model('attendance');
 const Branch = mongoose.model('branch');
 const Fine = mongoose.model('fine');
 const Salary = mongoose.model('salary');
-const { uploadToDrive, createEmployeeFolder, createRootFolder} = require('../service/google-drive.service');
+const { uploadToDrive, createEmployeeFolder, createRootFolder } = require('../service/google-drive.service');
 let ROOT_FOLDER_ID = "1W5m6_WUZDGV_WbusPQtCLQe9rYNBSX4k";
+const Deduction = mongoose.model('deduction');
+const Incentive = mongoose.model('incentive');
+const Advance = mongoose.model('advance');
+const Payroll = mongoose.model('payroll');
+
+
+const calculateDeduction = (lateMinutes, rules = []) => {
+  let deduction = 0;
+  for (let rule of rules) {
+    if (lateMinutes >= rule.late_minutes) {
+      deduction = rule.deduction;
+    }
+  }
+  return deduction;
+};
 
 
 const getAdminDashboard = async (branch_id) => {
 
-    const today = moment().format('YYYY-MM-DD');
-    const startOfMonth = moment().startOf('month').toDate();
-    const endOfMonth = moment().endOf('month').toDate();
+  const today = moment().format('YYYY-MM-DD');
+  const startOfMonth = moment().startOf('month').toDate();
+  const endOfMonth = moment().endOf('month').toDate();
 
-    // 🔥 Dynamic filter
-    const userFilter = {
-        role: 'employee',
-        status: 'Active',
-        ...(branch_id && { branch_id })
-    };
+  // 🔥 Dynamic filter
+  const userFilter = {
+    role: 'employee',
+    status: 'Active',
+    ...(branch_id && { branch_id })
+  };
 
-    const employees = await User.find(userFilter, { user_id: 1 });
-    const employeeIds = employees.map(e => e.user_id);
+  const employees = await User.find(userFilter, { user_id: 1 });
+  const employeeIds = employees.map(e => e.user_id);
 
-    // 🔹 Total Employees
-    const totalEmployees = employeeIds.length;
+  // 🔹 Total Employees
+  const totalEmployees = employeeIds.length;
 
-    // 🔹 Total Branches
-    const totalBranches = await Branch.countDocuments();
+  // 🔹 Total Branches
+  const totalBranches = await Branch.countDocuments();
 
-    // 🔹 Today Attendance
-    const todayAttendance = await Attendance.find({
+  // 🔹 Today Attendance
+  const todayAttendance = await Attendance.find({
+    employee_id: { $in: employeeIds },
+    attendance_date: today
+  });
+
+  const todayPresent = todayAttendance.length;
+
+  const todayIn = todayAttendance.filter(a => a.is_active).length;
+  const todayOut = todayAttendance.filter(a => !a.is_active).length;
+
+  // 🔹 Monthly Fines
+  const fines = await Fine.aggregate([
+    {
+      $match: {
         employee_id: { $in: employeeIds },
-        attendance_date: today
-    });
+        created_at: { $gte: startOfMonth, $lte: endOfMonth }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: '$amount' }
+      }
+    }
+  ]);
 
-    const todayPresent = todayAttendance.length;
+  const totalFines = fines[0]?.total || 0;
 
-    const todayIn = todayAttendance.filter(a => a.is_active).length;
-    const todayOut = todayAttendance.filter(a => !a.is_active).length;
+  // 🔹 Pending Salary
+  const pendingSalary = await Salary.countDocuments({
+    employee_id: { $in: employeeIds },
+    status: 'PENDING'
+  });
 
-    // 🔹 Monthly Fines
-    const fines = await Fine.aggregate([
-        {
-            $match: {
-                employee_id: { $in: employeeIds },
-                created_at: { $gte: startOfMonth, $lte: endOfMonth }
-            }
-        },
-        {
-            $group: {
-                _id: null,
-                total: { $sum: '$amount' }
-            }
-        }
-    ]);
-
-    const totalFines = fines[0]?.total || 0;
-
-    // 🔹 Pending Salary
-    const pendingSalary = await Salary.countDocuments({
+  // 🔹 Payroll
+  const payroll = await Salary.aggregate([
+    {
+      $match: {
         employee_id: { $in: employeeIds },
-        status: 'PENDING'
-    });
+        created_at: { $gte: startOfMonth, $lte: endOfMonth }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: '$net_salary' }
+      }
+    }
+  ]);
 
-    // 🔹 Payroll
-    const payroll = await Salary.aggregate([
-        {
-            $match: {
-                employee_id: { $in: employeeIds },
-                created_at: { $gte: startOfMonth, $lte: endOfMonth }
-            }
-        },
-        {
-            $group: {
-                _id: null,
-                total: { $sum: '$net_salary' }
-            }
-        }
-    ]);
+  const totalPayroll = payroll[0]?.total || 0;
 
-    const totalPayroll = payroll[0]?.total || 0;
+  // 🔹 Incentives (optional → placeholder if not built yet)
+  const totalIncentives = 0;
 
-    // 🔹 Incentives (optional → placeholder if not built yet)
-    const totalIncentives = 0;
+  return {
+    overview: {
+      totalEmployees,
+      totalBranches,
+      todayPresent,
+      pendingSalary
+    },
 
-    return {
-        overview: {
-            totalEmployees,
-            totalBranches,
-            todayPresent,
-            pendingSalary
-        },
-
-        monthly: {
-            todayIn,
-            todayOut,
-            incentives: totalIncentives,
-            fines: totalFines,
-            payroll: totalPayroll
-        }
-    };
+    monthly: {
+      todayIn,
+      todayOut,
+      incentives: totalIncentives,
+      fines: totalFines,
+      payroll: totalPayroll
+    }
+  };
 };
 
 
@@ -168,150 +183,444 @@ const createEmployee = async (data, files) => {
 // ============================================
 // 🔥 ADMIN OVERWRITE ATTENDANCE
 // ============================================
-const adminOverwriteAttendance = async (data) => {
-  const {
-    employee_id,
-    branch_id,
-    date,           // "YYYY-MM-DD"
-    in_time,        // "HH:mm" (24hr)
-    out_time,       // "HH:mm" (24hr) — can be null
-    status,         // PRESENT / LATE / ABSENT
-    reason,
-    admin_id
-  } = data;
+const adminOverwriteAttendance = async (employee_id, branch_id, admin_id, date, in_time, out_time) => {
 
-  // ✅ Build full datetime from date + time strings
+  // ✅ Normalize date — admin can punch for any date
+  const attendance_date = moment(date).format('YYYY-MM-DD');
+
+  // ✅ Build datetime from date + time
   const buildDateTime = (dateStr, timeStr) => {
-    if (!timeStr) return null;
+    if (!timeStr || timeStr.trim() === '') return null;
     const [hours, minutes] = timeStr.split(':');
-    const dt = moment(dateStr).toDate();
+    if (!hours || !minutes) return null;
+    const dt = moment(dateStr, 'YYYY-MM-DD').toDate();
     dt.setHours(parseInt(hours), parseInt(minutes), 0, 0);
     return dt;
   };
 
-  const punchIn = buildDateTime(date, in_time);
-  const punchOut = out_time ? buildDateTime(date, out_time) : null;
+  const punchIn = buildDateTime(attendance_date, in_time);
+  const punchOut = buildDateTime(attendance_date, out_time);
 
-  // ✅ Calculate duration if both times exist
-  let duration = 0;
-  let totalMinutes = 0;
-
-  if (punchIn && punchOut) {
-    duration = Math.floor((punchOut - punchIn) / (1000 * 60));
-    totalMinutes = duration;
+  // ✅ Calculate late minutes (vs 9 AM shift start)
+  let lateMinutes = 0;
+  if (punchIn) {
+    const shiftStart = moment(attendance_date).startOf('day').add(9, 'hours');
+    const actualIn = moment(punchIn);
+    if (actualIn.isAfter(shiftStart)) {
+      lateMinutes = actualIn.diff(shiftStart, 'minutes');
+    }
   }
 
-  // ✅ Check if record exists for this date
-  let record = await Attendance.findOne({ employee_id, attendance_date: date });
+  // ✅ Calculate deduction
+  const deductionConfig = await Deduction.findOne({});
+  const deductionAmount = calculateDeduction(
+    lateMinutes,
+    deductionConfig?.rules || []
+  );
 
-  if (record) {
-    // ✅ Overwrite — replace sessions with admin-set values
-    record.sessions = [{
-      punch_in: punchIn,
-      punch_out: punchOut,
-      duration
-    }];
-    record.total_hours = totalMinutes;
-    record.status = status;
-    record.is_active = !punchOut; // active if no punch out
-    record.overwritten_by = admin_id;
-    record.overwrite_reason = reason;
-    record.updated_at = new Date();
+  // ✅ Calculate duration
+  let duration = 0;
+  if (punchIn && punchOut) {
+    duration = Math.floor(
+      (punchOut.getTime() - punchIn.getTime()) / (1000 * 60)
+    );
+  }
 
-  } else {
-    // ✅ Create new record for that date
+  // ✅ Find existing record for that date
+  let record = await Attendance.findOne({ employee_id, attendance_date });
+
+  // ============================================
+  // 👉 NO RECORD — Create new
+  // ============================================
+  if (!record) {
     record = new Attendance({
       attendance_id: new mongoose.Types.ObjectId().toString(),
       employee_id,
       branch_id,
-      attendance_date: date,
+      attendance_date,
       sessions: [{
         punch_in: punchIn,
         punch_out: punchOut,
         duration
       }],
-      total_hours: totalMinutes,
-      status,
-      is_active: !punchOut,
-      late_minutes: 0,
-      deduction_amount: 0,
+      total_hours: duration,
+      status: (lateMinutes > 0 ? 'LATE' : 'PRESENT'),
+      late_minutes: lateMinutes,
+      deduction_amount: deductionAmount,
+      is_active: punchIn && !punchOut,  // active if punch in but no punch out
       punch_by: 'ADMIN',
       overwritten_by: admin_id,
-      overwrite_reason: reason,
     });
+
+    await record.save();
+
+    return {
+      type: 'CREATED',
+      message: 'Attendance created successfully'
+    };
   }
+
+  // ============================================
+  // 👉 RECORD EXISTS — Overwrite sessions
+  // ============================================
+  record.sessions = [{
+    punch_in: punchIn,
+    punch_out: punchOut,
+    duration
+  }];
+  record.total_hours = duration;
+  record.status = (lateMinutes > 0 ? 'LATE' : 'PRESENT');
+  record.late_minutes = lateMinutes;
+  record.deduction_amount = deductionAmount;
+  record.is_active = punchIn && !punchOut;
+  record.punch_by = 'ADMIN';
+  record.overwritten_by = admin_id;
+  record.updated_at = new Date();
+  record.markModified('sessions'); // ✅ force Mongoose to detect change
 
   await record.save();
 
-  await logActivity({
-    operator_id: admin_id,
-    action_type: 'OVERWRITE',
-    target_employee_id: employee_id,
-    metadata: { date, status, reason, in_time, out_time }
-  });
-
-  return { message: 'Attendance overwritten successfully' };
+  return {
+    type: 'OVERWRITTEN',
+    message: 'Attendance overwritten successfully'
+  };
 };
 
+const saveIncentive = async (data) => {
+  const { employee_id, branch_id, amount, reason, month, added_by } = data;
 
-const getAdminAttendance = async (branch_id, employee_id, month, year) => {
-  const start = moment(`${year}-${month}-01`).startOf('month').format('YYYY-MM-DD');
-  const end = moment(start).endOf('month').format('YYYY-MM-DD');
+  // ✅ Check if already exists for this employee + month
+  let existing = await Incentive.findOne({ employee_id, month });
 
-  const query = {
-    attendance_date: { $gte: start, $lte: end }
-  };
-
-  if (employee_id) query.employee_id = employee_id;
-
-  // ✅ If branch_id provided, get employee IDs for that branch first
-  if (branch_id) {
-    const User = mongoose.model('user');
-    const branchEmployees = await User.find(
-      { branch_id, status: 'Active' },
-      { user_id: 1 }
-    );
-    query.employee_id = { $in: branchEmployees.map(e => e.user_id) };
+  if (existing) {
+    // ✅ Update existing
+    existing.amount = amount;
+    existing.reason = reason;
+    existing.added_by = added_by;
+    existing.updated_at = new Date();
+    await existing.save();
+    return existing;
   }
 
-  const records = await Attendance.find(query).sort({ attendance_date: -1 });
-
-  // ✅ Get employee names
-  const User = mongoose.model('user');
-  const empIds = [...new Set(records.map(r => r.employee_id))];
-  const empList = await User.find(
-    { user_id: { $in: empIds } },
-    { user_id: 1, f_name: 1, l_name: 1, branch_name: 1, designation: 1 }
-  );
-
-  const empMap = {};
-  empList.forEach(e => { empMap[e.user_id] = e; });
-
-  return records.map(r => {
-    const emp = empMap[r.employee_id] || {};
-    const sessions = r.sessions || [];
-    const completedSessions = sessions.filter(s => s.punch_out);
-
-    return {
-      attendance_id: r.attendance_id,
-      employee_id: r.employee_id,
-      employee_name: emp.f_name ? `${emp.f_name} ${emp.l_name}` : 'Unknown',
-      branch: emp.branch_name || '',
-      designation: emp.designation || '',
-      date: r.attendance_date,
-      punch_in: sessions[0]?.punch_in || null,
-      punch_out: completedSessions[completedSessions.length - 1]?.punch_out || null,
-      total_hours: r.total_hours || 0,
-      status: r.status,
-      session_count: sessions.length
-    };
+  // ✅ Create new
+  const incentive = new Incentive({
+    incentive_id: new mongoose.Types.ObjectId().toString(),
+    employee_id,
+    branch_id,
+    amount,
+    reason,
+    month,
+    added_by
   });
+
+  await incentive.save();
+  return incentive;
+};
+
+const getIncentiveList = async (month, branch_id) => {
+  const query = { month };
+  if (branch_id) query.branch_id = branch_id;
+  return await Incentive.find(query);
+};
+
+const removeIncentive = async (incentive_id) => {
+  return await Incentive.findOneAndDelete({ incentive_id });
+};
+
+const saveAdvance = async (data) => {
+  const { employee_id, branch_id, amount, reason, month, added_by } = data;
+
+  // ✅ Check if already exists for this employee + month
+  let existing = await Advance.findOne({ employee_id, month });
+
+  if (existing) {
+    existing.amount = amount;
+    existing.reason = reason;
+    existing.added_by = added_by;
+    existing.updated_at = new Date();
+    await existing.save();
+    return existing;
+  }
+
+  const advance = new Advance({
+    advance_id: new mongoose.Types.ObjectId().toString(),
+    employee_id,
+    branch_id,
+    amount,
+    reason,
+    month,
+    added_by
+  });
+
+  await advance.save();
+  return advance;
+};
+
+const getAdvanceList = async (month, branch_id) => {
+  const query = { month };
+  if (branch_id) query.branch_id = branch_id;
+  return await Advance.find(query);
+};
+
+const removeAdvance = async (advance_id) => {
+  return await Advance.findOneAndDelete({ advance_id });
 };
 
 
+
+
+
+// ============================================
+// 🔥 GENERATE PAYROLL
+// ============================================
+const generatePayroll = async (month, branch_id, admin_id) => {
+  // ✅ Check if payroll already exists
+  const existing = await Payroll.findOne({ month, branch_id: branch_id || '' });
+  if (existing && existing.status !== 'DRAFT') {
+    throw new Error(`Payroll already ${existing.status} for this month`);
+  }
+
+  // ✅ Get all active employees for branch
+  const empQuery = {
+    role: { $regex: '^employee$', $options: 'i' },
+    status: { $regex: '^active$', $options: 'i' }
+  };
+  if (branch_id) empQuery.branch_id = branch_id;
+
+  const employees = await User.find(empQuery, {
+    user_id: 1, f_name: 1, l_name: 1,
+    salary: 1, branch_id: 1, branch_name: 1
+  });
+
+  const employeeIds = employees.map(e => e.user_id);
+
+  const employeesWithoutSalary = employees.filter(e => !e.salary);
+
+  if (employeesWithoutSalary.length > 0) {
+    throw new Error(
+      `Salary missing for ${employeesWithoutSalary.length} employees`, employeesWithoutSalary.length
+    );
+  }
+
+  // ✅ Date range for the month
+  const start = moment(month, 'YYYY-MM').startOf('month').format('YYYY-MM-DD');
+  const end = moment(month, 'YYYY-MM').endOf('month').format('YYYY-MM-DD');
+
+  // ✅ Fetch all data in parallel
+  const [attendanceRecords, fines, incentives, advances] = await Promise.all([
+    Attendance.find({
+      employee_id: { $in: employeeIds },
+      attendance_date: { $gte: start, $lte: end }
+    }),
+    Fine.find({
+      employee_id: { $in: employeeIds },
+      salary_processed: false,
+      $or: [
+        { apply_to: 'CURRENT', created_at: { $gte: new Date(start), $lte: new Date(end) } },
+        { apply_to: 'NEXT' }
+      ]
+    }),
+    Incentive.find({ employee_id: { $in: employeeIds }, month }),
+    Advance.find({ employee_id: { $in: employeeIds }, month })
+  ]);
+
+  // ✅ Build lookup maps
+  const attMap = {};
+  attendanceRecords.forEach(a => {
+    if (!attMap[a.employee_id]) attMap[a.employee_id] = [];
+    attMap[a.employee_id].push(a);
+  });
+
+  const fineMap = {};
+  fines.forEach(f => {
+    fineMap[f.employee_id] = (fineMap[f.employee_id] || 0) + f.amount;
+  });
+
+  const incentiveMap = {};
+  incentives.forEach(i => { incentiveMap[i.employee_id] = i.amount || 0; });
+
+  const advanceMap = {};
+  advances.forEach(a => { advanceMap[a.employee_id] = a.amount || 0; });
+
+  // ✅ Calculate working days in month
+  const totalWorkingDays = calculateWorkingDays(start, end);
+
+  // ✅ Build payroll per employee
+  const payrollEmployees = employees.map(emp => {
+    const records = attMap[emp.user_id] || [];
+    const presentDays = records.length;
+    const absentDays = totalWorkingDays - presentDays;
+    const lateDeduction = records.reduce((sum, r) => sum + (r.deduction_amount || 0), 0);
+
+    const baseSalary = emp.salary || 0;
+    const incentive = incentiveMap[emp.user_id] || 0;
+    const fine = fineMap[emp.user_id] || 0;
+    const advance = advanceMap[emp.user_id] || 0;
+
+    const netSalary = baseSalary + incentive - fine - lateDeduction - advance;
+
+    return {
+      employee_id: emp.user_id,
+      employee_name: `${emp.f_name} ${emp.l_name}`,
+      branch_id: emp.branch_id,
+      branch_name: emp.branch_name,
+      base_salary: baseSalary,
+      incentive,
+      fine,
+      late_deduction: lateDeduction,
+      advance,
+      net_salary: Math.max(0, netSalary), // ✅ never negative
+      working_days: totalWorkingDays,
+      present_days: presentDays,
+      absent_days: Math.max(0, absentDays)
+    };
+  });
+
+  // ✅ Save or update payroll
+  let payroll = existing || new Payroll({
+    payroll_id: new mongoose.Types.ObjectId().toString(),
+    month,
+    branch_id: branch_id || '',
+    generated_by: admin_id,
+    generated_at: new Date()
+  });
+
+  payroll.employees = payrollEmployees;
+  payroll.status = 'GENERATED';
+  payroll.generated_by = admin_id;
+  payroll.generated_at = new Date();
+  payroll.updated_at = new Date();
+
+  await payroll.save();
+
+  // ✅ Mark fines as processed
+  const fineIds = fines.map(f => f._id);
+  await Fine.updateMany(
+    { _id: { $in: fineIds } },
+    { salary_processed: true }
+  );
+
+  return payroll;
+};
+
+// ✅ Helper — count working days (Mon-Sat, skip Sunday)
+const calculateWorkingDays = (start, end) => {
+  let count = 0;
+  let current = moment(start);
+  const endDate = moment(end);
+
+  while (current.isSameOrBefore(endDate)) {
+    if (current.day() !== 0) count++; // 0 = Sunday
+    current.add(1, 'day');
+  }
+  return count;
+};
+
+// ============================================
+// 🔥 GET PAYROLL STATUS
+// ============================================
+const getPayroll = async (month, branch_id) => {
+  const payroll = await Payroll.findOne({
+    month,
+    branch_id: branch_id || ''
+  });
+  return payroll;
+};
+
+// ============================================
+// 🔥 LOCK PAYROLL
+// ============================================
+const lockPayroll = async (month, branch_id, admin_id) => {
+  const payroll = await Payroll.findOne({ month, branch_id: branch_id || '' });
+  if (!payroll) throw new Error('Payroll not found');
+  if (payroll.status !== 'GENERATED') throw new Error('Payroll must be GENERATED to lock');
+
+  payroll.status = 'LOCKED';
+  payroll.locked_by = admin_id;
+  payroll.locked_at = new Date();
+  payroll.updated_at = new Date();
+  await payroll.save();
+  return payroll;
+};
+
+// ============================================
+// 🔥 UNLOCK PAYROLL
+// ============================================
+const unlockPayroll = async (month, branch_id) => {
+  const payroll = await Payroll.findOne({ month, branch_id: branch_id || '' });
+  if (!payroll) throw new Error('Payroll not found');
+  if (payroll.status !== 'LOCKED') throw new Error('Payroll must be LOCKED to unlock');
+
+  payroll.status = 'GENERATED';
+  payroll.updated_at = new Date();
+  await payroll.save();
+  return payroll;
+};
+
+// ============================================
+// 🔥 MARK AS PAID
+// ============================================
+const markAsPaid = async (month, branch_id, admin_id) => {
+  const payroll = await Payroll.findOne({ month, branch_id: branch_id || '' });
+  if (!payroll) throw new Error('Payroll not found');
+  if (payroll.status !== 'LOCKED') throw new Error('Payroll must be LOCKED to mark as paid');
+
+  payroll.status = 'PAID';
+  payroll.paid_by = admin_id;
+  payroll.paid_at = new Date();
+  payroll.updated_at = new Date();
+  await payroll.save();
+  return payroll;
+};
+
+const updateEmployeeSalaries = async (updates, admin_id) => {
+
+  // 🔥 Validate input
+  const validUpdates = updates.filter(u =>
+    u.employee_id && typeof u.salary === 'number'
+  );
+
+  if (validUpdates.length === 0) {
+    throw new Error('No valid salary updates found');
+  }
+
+  // 🔥 Prepare bulk operations
+  const bulkOps = validUpdates.map(u => ({
+    updateOne: {
+      filter: { user_id: u.employee_id, role: 'employee', status: 'Active' },
+      update: {
+        $set: {
+          salary: u.salary,
+          updatedOn: new Date(),
+          updated_by: admin_id || null
+        }
+      }
+    }
+  }));
+
+  // 🔥 Execute bulk update
+  const result = await User.bulkWrite(bulkOps);
+
+  return {
+    matched: result.matchedCount,
+    modified: result.modifiedCount
+  };
+};
+
 module.exports = {
-    getAdminDashboard,
-    createEmployee,
-    adminOverwriteAttendance,
-    getAdminAttendance
+  getAdminDashboard,
+  createEmployee,
+  adminOverwriteAttendance,
+  saveIncentive,
+  getIncentiveList,
+  removeIncentive,
+  saveAdvance,
+  getAdvanceList,
+  removeAdvance,
+  generatePayroll,
+  getPayroll,
+  lockPayroll,
+  unlockPayroll,
+  markAsPaid,
+  updateEmployeeSalaries
 };

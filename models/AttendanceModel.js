@@ -64,6 +64,18 @@ let attendanceSchema = new Schema({
     default: false
   },
 
+  overwritten_by: {
+    type: String
+  },
+
+  overwrite_reason: {
+    type: String
+  },
+
+  punch_by: {
+    type: String
+  },
+
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }
 });

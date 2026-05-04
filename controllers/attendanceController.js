@@ -86,3 +86,23 @@ exports.getBranchesWithLocation = async (req, res) => {
     });
   }
 };
+
+exports.getEmployeePayroll = async (req, res) => {
+  try {
+    const { employee_id } = req.params;
+
+    const result = await attendanceService.getEmployeePayroll(employee_id);
+
+    res.status(200).send({
+      error: false,
+      message: 'Payroll fetched',
+      data: result
+    });
+
+  } catch (err) {
+    res.status(500).send({
+      error: true,
+      message: err.message
+    });
+  }
+};

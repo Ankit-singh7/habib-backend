@@ -3,6 +3,7 @@ const moment = require('moment');
 
 const Attendance = mongoose.model('attendance');
 const Deduction = mongoose.model('deduction');
+const Payroll = mongoose.model('payroll');
 
 const calculateDeduction = (lateMinutes, rules = []) => {
   let deduction = 0;
@@ -202,7 +203,7 @@ const getAttendanceList = async (employee_id, month, year) => {
 
 const getBranchesWithLocation = async () => {
   const Branch = mongoose.model('branch');
-  
+
   const branches = await Branch.find(
     { latitude: { $ne: 0 }, longitude: { $ne: 0 } }, // ✅ only branches with coordinates
     { branch_id: 1, branch_name: 1, latitude: 1, longitude: 1 }
@@ -211,4 +212,40 @@ const getBranchesWithLocation = async () => {
   return branches;
 };
 
-module.exports = { punch, getDashboard, getAttendanceList, getBranchesWithLocation };
+const getEmployeePayroll = async (employee_id) => {
+  // ✅ Only show PAID payrolls to employee
+  const payrolls = await Payroll.find(
+    {
+      status: 'PAID',
+      'employees.employee_id': employee_id
+    },
+    { month: 1, status: 1, employees: 1 }
+  ).sort({ month: -1 }).lean();
+
+  const result = payrolls.map((p) => {
+    const emp = p.employees.find(
+      (e) => e.employee_id === employee_id
+    );
+
+    if (!emp) return null;
+
+    return {
+      month: p.month,                    // "2026-05"
+      status: p.status,
+      base: emp.base_salary,
+      incentives: emp.incentive,
+      fines: emp.fine,
+      late_deduction: emp.late_deduction,
+      advance: emp.advance,
+      net: emp.net_salary,
+      present_days: emp.present_days,
+      absent_days: emp.absent_days,
+      working_days: emp.working_days,
+      branch: emp.branch_name
+    };
+  }).filter(Boolean);
+
+  return result;
+};
+
+module.exports = { punch, getDashboard, getAttendanceList, getBranchesWithLocation, getEmployeePayroll };

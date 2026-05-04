@@ -16,8 +16,25 @@ module.exports.setRouter = (app) => {
         ]),
         adminController.createEmployee
     );
-
-    app.get(`${baseUrl}/attendance/list`, adminController.getAdminAttendance);
     app.post(`${baseUrl}/attendance/overwrite`, adminController.adminOverwriteAttendance);
+
+    app.post(`${baseUrl}/incentive/save`, adminController.saveIncentive);
+    app.get(`${baseUrl}/incentive/list`, adminController.getIncentiveList);
+    app.delete(`${baseUrl}/incentive/:id`, adminController.removeIncentive);
+
+    // ✅ Advance routes
+    app.post(`${baseUrl}/advance/save`, adminController.saveAdvance);
+    app.get(`${baseUrl}/advance/list`, adminController.getAdvanceList);
+    app.delete(`${baseUrl}/advance/:id`, adminController.removeAdvance);
+
+
+    // payroll routes
+    app.get(`${baseUrl}/payroll`, adminController.getPayroll);
+    app.post(`${baseUrl}/payroll/generate`, adminController.generatePayroll);
+    app.post(`${baseUrl}/payroll/lock`, adminController.lockPayroll);
+    app.post(`${baseUrl}/payroll/unlock`, adminController.unlockPayroll);
+    app.post(`${baseUrl}/payroll/paid`, adminController.markAsPaid);
+
+    app.post(`${baseUrl}/employee/salary/bulk-update`, adminController.updateEmployeeSalaries);
 
 }

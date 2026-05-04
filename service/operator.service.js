@@ -71,56 +71,78 @@ const getOperatorDashboard = async (operatorId) => {
 };
 
 const getEmployeeListWithStatus = async () => {
+  const today = moment().format('YYYY-MM-DD');
 
-    const today = moment().format('YYYY-MM-DD');
+  // 🔹 Step 1: Get all active employees
+  const employees = await User.find(
+    {
+      role: { $regex: '^employee$', $options: 'i' },
+      status: { $regex: '^active$', $options: 'i' }
+    },
+    {
+      user_id: 1,
+      f_name: 1,
+      l_name: 1,
+      designation: 1,
+      branch_name: 1,
+      branch_id: 1,
+      shift: 1,
+      salary: 1
+    }
+  );
 
-    // 🔹 Step 1: Get all active employees
-    const employees = await User.find(
-        {
-            role: { $regex: '^employee$', $options: 'i' },
-            status: { $regex: '^active$', $options: 'i' }
-        },
-        {
-            user_id: 1,
-            f_name: 1,
-            l_name: 1,
-            designation: 1,
-            branch_name: 1,
-            branch_id: 1,
-            shift: 1
-        }
-    );
+  const employeeIds = employees.map(e => e.user_id);
 
-    const employeeIds = employees.map(e => e.user_id);
+  // 🔹 Step 2: Get today's full attendance record
+  const attendance = await Attendance.find(
+    {
+      employee_id: { $in: employeeIds },
+      attendance_date: today
+    }
+    // ✅ No projection — fetch full record for sessions/times
+  );
 
-    // 🔹 Step 2: Get today's attendance
-    const attendance = await Attendance.find(
-        {
-            employee_id: { $in: employeeIds },
-            attendance_date: today
-        },
-        {
-            employee_id: 1,
-            is_active: 1
-        }
-    );
+  // 🔹 Step 3: Build attendance map
+  const attendanceMap = {};
+  attendance.forEach(a => {
+    attendanceMap[a.employee_id] = a;
+  });
 
-    // 🔹 Step 3: Create map
-    const attendanceMap = {};
-    attendance.forEach(a => {
-        attendanceMap[a.employee_id] = a;
-    });
+  // 🔹 Step 4: Merge employee + attendance
+  return employees.map(emp => {
+    const record = attendanceMap[emp.user_id] || null;
+    const sessions = record?.sessions || [];
+    const completedSessions = sessions.filter(s => s.punch_out);
 
-    // 🔹 Step 4: Merge data
-    return employees.map(emp => ({
-        user_id: emp.user_id,
-        name: `${emp.f_name} ${emp.l_name}`,
-        designation: emp.designation,
-        branch_name: emp.branch_name,
-        status: attendanceMap[emp.user_id]?.is_active ? 'IN' : 'OUT',
-        shift: emp.shift,
-        branch_id: emp.branch_id
-    }));
+    // ✅ Determine status
+    let status = 'ABSENT';
+    if (record) {
+      if (record.is_active) {
+        status = record.late_minutes > 0 ? 'LATE' : 'PRESENT';
+      } else if (sessions.length > 0) {
+        status = record.late_minutes > 0 ? 'LATE' : 'PRESENT';
+      }
+    }
+
+    return {
+      user_id: emp.user_id,
+      name: `${emp.f_name} ${emp.l_name}`,
+      designation: emp.designation,
+      branch_name: emp.branch_name,
+      branch_id: emp.branch_id,
+      shift: emp.shift,
+      salary: emp.salary,
+
+      // ✅ Attendance data
+      status,
+      punch_in: sessions[0]?.punch_in || null,           // first punch in
+      punch_out: completedSessions[completedSessions.length - 1]?.punch_out || null, // last punch out
+      total_hours: record?.total_hours || 0,
+      late_minutes: record?.late_minutes || 0,
+      session_count: sessions.length,
+      reason: emp.overwrite_reason
+    };
+  });
 };
 
 const operatorPunch = async (employee_id, operator_id) => {
