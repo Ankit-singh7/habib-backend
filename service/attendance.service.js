@@ -40,7 +40,7 @@ const punch = async (employee_id, branch_id) => {
     const deductionConfig = await Deduction.findOne({});
     const deductionAmount = calculateDeduction(
       lateMinutes,
-      deductionConfig?.rules || []
+      deductionConfig && deductionConfig.rules ? deductionConfig.rules : []
     );
 
     record = new Attendance({
@@ -157,13 +157,15 @@ const getDashboard = async (employee_id) => {
   }
 
   // ✅ Get last session for display
-  const sessions = todayAttendance?.sessions || [];
+  const sessions = todayAttendance && todayAttendance.sessions
+  ? todayAttendance.sessions
+  : [];
   const lastSession = sessions[sessions.length - 1] || null;
 
   return {
     today: todayAttendance ? {
-      punch_in: lastSession?.punch_in || null,
-      punch_out: lastSession?.punch_out || null,
+      punch_in: lastSession && lastSession.punch_in ? lastSession.punch_in : null,
+      punch_out: lastSession && lastSession.punch_out ? lastSession.punch_out : null,
       total_hours: todayAttendance.total_hours || 0,
       late_minutes: todayAttendance.late_minutes || 0,
       deduction: todayAttendance.deduction_amount || 0,

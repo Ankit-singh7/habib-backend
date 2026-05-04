@@ -131,7 +131,7 @@ const createEmployee = async (data, files) => {
 
   // 🔥 Step 2: Name split
 
-  const fullName = `${data?.f_name} ${data?.l_name}`;
+  const fullName = `${data && data.f_name ? data.f_name : ''} ${data && data.l_name ? data.l_name : ''}`;
 
   // 🔥 Step 3: Employee folder
   const employeeFolderId = await createEmployeeFolder(fullName, ROOT_FOLDER_ID);
@@ -140,11 +140,11 @@ const createEmployee = async (data, files) => {
   let aadhaarUrl = null;
   let panUrl = null;
 
-  if (files?.aadhaar) {
+  if (files && files.aadhaar) {
     aadhaarUrl = await uploadToDrive(files.aadhaar[0], employeeFolderId);
   }
 
-  if (files?.pan) {
+  if (files && files.pan) {
     panUrl = await uploadToDrive(files.pan[0], employeeFolderId);
   }
 
@@ -215,7 +215,7 @@ const adminOverwriteAttendance = async (employee_id, branch_id, admin_id, date, 
   const deductionConfig = await Deduction.findOne({});
   const deductionAmount = calculateDeduction(
     lateMinutes,
-    deductionConfig?.rules || []
+    deductionConfig && deductionConfig.rules ? deductionConfig.rules : []
   );
 
   // ✅ Calculate duration
