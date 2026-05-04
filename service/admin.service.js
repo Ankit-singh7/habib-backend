@@ -74,7 +74,7 @@ const getAdminDashboard = async (branch_id) => {
     }
   ]);
 
-  const totalFines = fines[0]?.total || 0;
+  const totalFines = fines.length ? fines[0].total : 0;
 
   // 🔹 Pending Salary
   const pendingSalary = await Salary.countDocuments({
