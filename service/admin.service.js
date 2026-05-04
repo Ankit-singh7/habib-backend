@@ -98,7 +98,7 @@ const getAdminDashboard = async (branch_id) => {
     }
   ]);
 
-  const totalPayroll = payroll[0]?.total || 0;
+  const totalPayroll = payroll.length ? payroll[0].total : 0;
 
   // 🔹 Incentives (optional → placeholder if not built yet)
   const totalIncentives = 0;
