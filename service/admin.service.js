@@ -12,6 +12,7 @@ const Deduction = mongoose.model('deduction');
 const Incentive = mongoose.model('incentive');
 const Advance = mongoose.model('advance');
 const Payroll = mongoose.model('payroll');
+const { globalActivity } = require('../libs/loggerLib')
 
 
 const calculateDeduction = (lateMinutes, rules = []) => {
@@ -252,6 +253,13 @@ const adminOverwriteAttendance = async (employee_id, branch_id, admin_id, date, 
       overwritten_by: admin_id,
     });
 
+    await globalActivity({
+      operator_id:        'admin',
+      action_type:        'OVERWRITE_ATTENDANCE',
+      target_employee_id: employee_id,
+      metadata:           { date, in_time, out_time }
+    });
+
     await record.save();
 
     return {
@@ -313,6 +321,14 @@ const saveIncentive = async (data) => {
     added_by
   });
 
+  await globalActivity({
+    operator_id: 'admin',
+    action_type: 'INCENTIVE',
+    target_employee_id: employee_id,
+    branch_id: branch_id,
+    metadata: { amount, reason, month }
+  });
+
   await incentive.save();
   return incentive;
 };
@@ -350,6 +366,14 @@ const saveAdvance = async (data) => {
     reason,
     month,
     added_by
+  });
+
+  await globalActivity({
+    operator_id: 'admin',
+    action_type: 'ADVANCE',
+    target_employee_id: employee_id,
+    branch_id: branch_id,
+    metadata: { amount, reason, month }
   });
 
   await advance.save();
@@ -449,7 +473,7 @@ const generatePayroll = async (month, branch_id, admin_id) => {
   const payrollEmployees = employees.map(emp => {
     const records = attMap[emp.user_id] || [];
     const presentDays = records.length;
-    const absentDays = totalWorkingDays - presentDays;
+    const absentDays = Math.max(0, totalWorkingDays - presentDays);
     const lateDeduction = records.reduce((sum, r) => sum + (r.deduction_amount || 0), 0);
 
     const baseSalary = emp.salary || 0;
@@ -457,7 +481,19 @@ const generatePayroll = async (month, branch_id, admin_id) => {
     const fine = fineMap[emp.user_id] || 0;
     const advance = advanceMap[emp.user_id] || 0;
 
-    const netSalary = baseSalary + incentive - fine - lateDeduction - advance;
+    // ✅ Per day salary
+    const perDaySalary = totalWorkingDays > 0
+      ? baseSalary / totalWorkingDays
+      : 0;
+
+    // ✅ Earned salary based on days present
+    const earnedSalary = Math.round(perDaySalary * presentDays);
+
+    // ✅ Absent deduction
+    const absentDeduction = Math.round(perDaySalary * absentDays);
+
+    // ✅ Net = earned + incentive - fine - lateDeduction - advance
+    const netSalary = earnedSalary + incentive - fine - lateDeduction - advance;
 
     return {
       employee_id: emp.user_id,
@@ -465,14 +501,17 @@ const generatePayroll = async (month, branch_id, admin_id) => {
       branch_id: emp.branch_id,
       branch_name: emp.branch_name,
       base_salary: baseSalary,
+      per_day_salary: Math.round(perDaySalary),
+      earned_salary: earnedSalary,
+      absent_deduction: absentDeduction,
       incentive,
       fine,
       late_deduction: lateDeduction,
       advance,
-      net_salary: Math.max(0, netSalary), // ✅ never negative
+      net_salary: Math.max(0, netSalary),
       working_days: totalWorkingDays,
       present_days: presentDays,
-      absent_days: Math.max(0, absentDays)
+      absent_days: absentDays
     };
   });
 
@@ -569,6 +608,14 @@ const markAsPaid = async (month, branch_id, admin_id) => {
   payroll.paid_by = admin_id;
   payroll.paid_at = new Date();
   payroll.updated_at = new Date();
+
+  await globalActivity({
+  operator_id:        'admin',
+  action_type:        'SALARY_PAID',
+  target_employee_id: null, // affects all
+  branch_id:          branch_id,
+  metadata: { month, total_employees: payroll.employees.length }
+});
   await payroll.save();
   return payroll;
 };
@@ -607,6 +654,122 @@ const updateEmployeeSalaries = async (updates, admin_id) => {
   };
 };
 
+
+// ✅ Get all activity for admin
+const getAdminActivity = async (branch_id, limit = 50) => {
+  const ActivityLog = mongoose.model('activity_log');
+  const User = mongoose.model('user');
+
+  const logs = await ActivityLog.find({})
+    .sort({ created_at: -1 })
+    .limit(limit)
+    .lean();
+
+  const userIds = [...new Set([
+    ...logs.map(l => l.operator_id),
+    ...logs.map(l => l.target_employee_id)
+  ].filter(Boolean))];
+
+  const users = await User.find(
+    { user_id: { $in: userIds } },
+    { user_id: 1, f_name: 1, l_name: 1 }
+  ).lean();
+
+  const userMap = {};
+  users.forEach(u => { userMap[u.user_id] = `${u.f_name} ${u.l_name}`; });
+
+  return logs.map(log => ({
+    log_id:          log.log_id,
+    action_type:     log.action_type,
+    operator:        userMap[log.operator_id] || 'System',
+    target_employee: userMap[log.target_employee_id] || null,
+    metadata:        log.metadata,
+    created_at:      log.created_at,
+    message:         formatActivityMessage(
+      log.action_type, log.metadata,
+      userMap[log.operator_id],
+      userMap[log.target_employee_id],
+      'admin' 
+    ),
+  }));
+};
+
+// ✅ Format human readable messages
+const formatActivityMessage = (actionType, metadata, operatorName, employeeName, viewMode = 'employee') => {
+  const op  = operatorName || 'Someone';
+  const emp = employeeName || 'you';
+
+  // ✅ For employee view — "you" context
+  // ✅ For admin view — show employee name
+
+  switch (actionType) {
+
+    case 'PUNCH_IN':
+      return viewMode === 'admin'
+        ? `${op} punched in ${emp}`
+        : `${op} recorded your punch in`;
+
+    case 'PUNCH_OUT':
+      return viewMode === 'admin'
+        ? `${op} punched out ${emp}`
+        : `${op} recorded your punch out`;
+
+    // ✅ Keep old PUNCH for backward compat
+    case 'PUNCH':
+      if (metadata?.type === 'PUNCH_IN') {
+        return viewMode === 'admin'
+          ? `${op} punched in ${emp}`
+          : `${op} recorded your punch in`;
+      }
+      return viewMode === 'admin'
+        ? `${op} punched out ${emp}`
+        : `${op} recorded your punch out`;
+
+    case 'FINE':
+      return viewMode === 'admin'
+        ? `${op} added fine of ₹${metadata?.amount} for ${emp} — ${metadata?.reason || ''}`
+        : `Fine of ₹${metadata?.amount} added by ${op} — ${metadata?.reason || ''}`;
+
+    case 'INCENTIVE':
+      return viewMode === 'admin'
+        ? `Incentive of ₹${metadata?.amount} added for ${emp} (${metadata?.month})`
+        : `Incentive of ₹${metadata?.amount} added for ${metadata?.month}`;
+
+    case 'ADVANCE':
+      return viewMode === 'admin'
+        ? `Advance of ₹${metadata?.amount} added for ${emp} (${metadata?.month})`
+        : `Advance of ₹${metadata?.amount} added for ${metadata?.month}`;
+
+    case 'SHIFT_CHANGE':
+      return viewMode === 'admin'
+        ? `${op} changed shift of ${emp} from ${metadata?.old_shift || '?'} → ${metadata?.new_shift || '?'}`
+        : `Your shift changed from ${metadata?.old_shift || '?'} → ${metadata?.new_shift || '?'} by ${op}`;
+
+    case 'BRANCH_CHANGE':
+      const oldBranch = metadata?.old_branch || 'previous branch';
+      const newBranch = metadata?.new_branch || 'new branch';
+      return viewMode === 'admin'
+        ? `${op} moved ${emp} from ${oldBranch} → ${newBranch}`
+        : `Your branch changed from ${oldBranch} → ${newBranch} by ${op}`;
+
+    case 'SALARY_PAID':
+      return `Salary paid for ${metadata?.month}`;
+
+    case 'OVERWRITE':
+      return viewMode === 'admin'
+        ? `${op} updated attendance of ${emp} for ${metadata?.date}`
+        : `Your attendance was updated by ${op} for ${metadata?.date}`;
+
+    case 'ADMIN_PUNCH':
+      return viewMode === 'admin'
+        ? `${op} recorded attendance of ${emp} for ${metadata?.date}`
+        : `Attendance recorded by ${op} for ${metadata?.date}`;
+
+    default:
+      return `${op} performed ${actionType} for ${emp}`;
+  }
+};
+
 module.exports = {
   getAdminDashboard,
   createEmployee,
@@ -622,5 +785,6 @@ module.exports = {
   lockPayroll,
   unlockPayroll,
   markAsPaid,
-  updateEmployeeSalaries
+  updateEmployeeSalaries,
+  getAdminActivity
 };

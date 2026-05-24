@@ -6,6 +6,8 @@ const sessionSchema = new Schema({
   punch_in: { type: Date, default: null },
   punch_out: { type: Date, default: null },
   duration: { type: Number, default: 0 }, // minutes for this session
+  punch_in_photo: { type: String, default: null },
+  punch_out_photo: { type: String, default: null }
 }, { _id: false });
 
 let attendanceSchema = new Schema({

@@ -18,16 +18,16 @@ const calculateDeduction = (lateMinutes, rules = []) => {
 // ============================================
 // 🔥 PUNCH IN / PUNCH OUT
 // ============================================
-const punch = async (employee_id, branch_id) => {
+
+const punch = async (employee_id, branch_id, photoUrl = null) => {
   const now = new Date();
   const attendance_date = moment(now).format('YYYY-MM-DD');
 
-  // ✅ Find today's record
+
+
   let record = await Attendance.findOne({ employee_id, attendance_date });
 
-  // ============================================
-  // 👉 FIRST PUNCH IN OF THE DAY — create record
-  // ============================================
+  // 👉 FIRST PUNCH IN
   if (!record) {
     const shiftStart = moment(now).startOf('day').add(9, 'hours');
     const actualIn = moment(now);
@@ -48,24 +48,25 @@ const punch = async (employee_id, branch_id) => {
       employee_id,
       branch_id,
       attendance_date,
-      sessions: [{ punch_in: now, punch_out: null, duration: 0 }],
+      sessions: [{
+        punch_in: now,
+        punch_out: null,
+        duration: 0,
+        punch_in_photo: photoUrl  // ✅ NEW
+      }],
       total_hours: 0,
       status: 'PRESENT',
       late_minutes: lateMinutes,
       deduction_amount: deductionAmount,
-      is_active: true,  // currently punched in
+      is_active: true,
     });
 
     await record.save();
-
     return { type: 'PUNCH_IN', message: 'Punch In successful' };
   }
 
-  // ============================================
-  // 👉 PUNCH OUT — close the active session
-  // ============================================
+  // 👉 PUNCH OUT — unchanged
   if (record.is_active) {
-    // Find the last session that has no punch_out
     const activeSession = record.sessions
       .slice()
       .reverse()
@@ -77,9 +78,9 @@ const punch = async (employee_id, branch_id) => {
       );
       activeSession.punch_out = now;
       activeSession.duration = duration;
+      activeSession.punch_out_photo = photoUrl;
     }
 
-    // ✅ Recalculate total minutes across ALL sessions
     const totalMinutes = record.sessions.reduce(
       (sum, s) => sum + (s.duration || 0), 0
     );
@@ -87,23 +88,22 @@ const punch = async (employee_id, branch_id) => {
     record.total_hours = totalMinutes;
     record.is_active = false;
     record.updated_at = new Date();
-
+    record.markModified('sessions');
     await record.save();
 
-    return {
-      type: 'PUNCH_OUT',
-      message: 'Punch Out successful',
-      total_hours: totalMinutes
-    };
+    return { type: 'PUNCH_OUT', message: 'Punch Out successful', total_hours: totalMinutes };
   }
 
-  // ============================================
-  // 👉 SUBSEQUENT PUNCH IN — add new session
-  // ============================================
-  record.sessions.push({ punch_in: now, punch_out: null, duration: 0 });
+  // 👉 SUBSEQUENT PUNCH IN
+  record.sessions.push({
+    punch_in: now,
+    punch_out: null,
+    duration: 0,
+    punch_in_photo: photoUrl
+  });
   record.is_active = true;
   record.updated_at = new Date();
-
+  record.markModified('sessions');
   await record.save();
 
   return { type: 'PUNCH_IN', message: 'Punch In successful' };
@@ -194,8 +194,7 @@ const getAttendanceList = async (employee_id, month, year) => {
 
   return records.map((r) => ({
     date: r.attendance_date,
-    sessions: r.sessions,          // ✅ all sessions
-    total_hours: r.total_hours,    // ✅ total for the day
+        total_hours: r.total_hours,    // ✅ total for the day
     status: r.status,
     late_minutes: r.late_minutes,
     deduction: r.deduction_amount
@@ -215,7 +214,6 @@ const getBranchesWithLocation = async () => {
 };
 
 const getEmployeePayroll = async (employee_id) => {
-  // ✅ Only show PAID payrolls to employee
   const payrolls = await Payroll.find(
     {
       status: 'PAID',
@@ -232,22 +230,135 @@ const getEmployeePayroll = async (employee_id) => {
     if (!emp) return null;
 
     return {
-      month: p.month,                    // "2026-05"
-      status: p.status,
-      base: emp.base_salary,
-      incentives: emp.incentive,
-      fines: emp.fine,
+      month:          p.month,
+      status:         p.status,
+      base:           emp.base_salary,
+      per_day_salary: emp.per_day_salary || Math.round(emp.base_salary / (emp.working_days || 26)),
+      earned_salary:  emp.earned_salary  || emp.net_salary, // ✅ fallback for old records
+      incentives:     emp.incentive,
+      fines:          emp.fine,
       late_deduction: emp.late_deduction,
-      advance: emp.advance,
-      net: emp.net_salary,
-      present_days: emp.present_days,
-      absent_days: emp.absent_days,
-      working_days: emp.working_days,
-      branch: emp.branch_name
+      advance:        emp.advance,
+      net:            emp.net_salary,
+      present_days:   emp.present_days,
+      absent_days:    emp.absent_days,
+      working_days:   emp.working_days,
+      branch:         emp.branch_name
     };
   }).filter(Boolean);
 
   return result;
 };
 
-module.exports = { punch, getDashboard, getAttendanceList, getBranchesWithLocation, getEmployeePayroll };
+// In attendance.service.js or new activity.service.js
+const getEmployeeActivity = async (employee_id, limit = 20) => {
+  const ActivityLog = mongoose.model('activity_log');
+  const User = mongoose.model('user');
+
+  const logs = await ActivityLog.find({
+    target_employee_id: employee_id
+  })
+  .sort({ created_at: -1 })
+  .limit(limit)
+  .lean();
+
+  // ✅ Get operator names
+  const operatorIds = [...new Set(logs.map(l => l.operator_id).filter(Boolean))];
+  const operators = await User.find(
+    { user_id: { $in: operatorIds } },
+    { user_id: 1, f_name: 1, l_name: 1 }
+  ).lean();
+
+  const operatorMap = {};
+  operators.forEach(o => {
+    operatorMap[o.user_id] = `${o.f_name} ${o.l_name}`;
+  });
+
+  return logs.map(log => ({
+    log_id:      log.log_id,
+    action_type: log.action_type,
+    operator:    operatorMap[log.operator_id] || 'System',
+    metadata:    log.metadata,
+    created_at:  log.created_at,
+    // ✅ Human readable message
+    message:     formatActivityMessage(log.action_type, log.metadata, operatorMap[log.operator_id], 'employee')
+  }));
+};
+
+// ✅ Format human readable messages
+const formatActivityMessage = (actionType, metadata, operatorName, employeeName, viewMode = 'employee') => {
+  const op  = operatorName || 'Someone';
+  const emp = employeeName || 'you';
+
+  // ✅ For employee view — "you" context
+  // ✅ For admin view — show employee name
+
+  switch (actionType) {
+
+    case 'PUNCH_IN':
+      return viewMode === 'admin'
+        ? `${op} punched in ${emp}`
+        : `${op} recorded your punch in`;
+
+    case 'PUNCH_OUT':
+      return viewMode === 'admin'
+        ? `${op} punched out ${emp}`
+        : `${op} recorded your punch out`;
+
+    // ✅ Keep old PUNCH for backward compat
+    case 'PUNCH':
+      if (metadata?.type === 'PUNCH_IN') {
+        return viewMode === 'admin'
+          ? `${op} punched in ${emp}`
+          : `${op} recorded your punch in`;
+      }
+      return viewMode === 'admin'
+        ? `${op} punched out ${emp}`
+        : `${op} recorded your punch out`;
+
+    case 'FINE':
+      return viewMode === 'admin'
+        ? `${op} added fine of ₹${metadata?.amount} for ${emp} — ${metadata?.reason || ''}`
+        : `Fine of ₹${metadata?.amount} added by ${op} — ${metadata?.reason || ''}`;
+
+    case 'INCENTIVE':
+      return viewMode === 'admin'
+        ? `Incentive of ₹${metadata?.amount} added for ${emp} (${metadata?.month})`
+        : `Incentive of ₹${metadata?.amount} added for ${metadata?.month}`;
+
+    case 'ADVANCE':
+      return viewMode === 'admin'
+        ? `Advance of ₹${metadata?.amount} added for ${emp} (${metadata?.month})`
+        : `Advance of ₹${metadata?.amount} added for ${metadata?.month}`;
+
+    case 'SHIFT_CHANGE':
+      return viewMode === 'admin'
+        ? `${op} changed shift of ${emp} from ${metadata?.old_shift || '?'} → ${metadata?.new_shift || '?'}`
+        : `Your shift changed from ${metadata?.old_shift || '?'} → ${metadata?.new_shift || '?'} by ${op}`;
+
+    case 'BRANCH_CHANGE':
+      const oldBranch = metadata?.old_branch || 'previous branch';
+      const newBranch = metadata?.new_branch || 'new branch';
+      return viewMode === 'admin'
+        ? `${op} moved ${emp} from ${oldBranch} → ${newBranch}`
+        : `Your branch changed from ${oldBranch} → ${newBranch} by ${op}`;
+
+    case 'SALARY_PAID':
+      return `Salary paid for ${metadata?.month}`;
+
+    case 'OVERWRITE':
+      return viewMode === 'admin'
+        ? `${op} updated attendance of ${emp} for ${metadata?.date}`
+        : `Your attendance was updated by ${op} for ${metadata?.date}`;
+
+    case 'ADMIN_PUNCH':
+      return viewMode === 'admin'
+        ? `${op} recorded attendance of ${emp} for ${metadata?.date}`
+        : `Attendance recorded by ${op} for ${metadata?.date}`;
+
+    default:
+      return `${op} performed ${actionType} for ${emp}`;
+  }
+};
+
+module.exports = { punch, getDashboard, getAttendanceList, getBranchesWithLocation, getEmployeePayroll, getEmployeeActivity };

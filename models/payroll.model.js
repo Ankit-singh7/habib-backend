@@ -35,7 +35,10 @@ let payrollSchema = new Schema({
   locked_at:    { type: Date, default: null },
   paid_at:      { type: Date, default: null },
   created_at:   { type: Date, default: Date.now },
-  updated_at:   { type: Date, default: Date.now }
+  updated_at:   { type: Date, default: Date.now },
+  per_day_salary:   { type: Number, default: 0 },
+  earned_salary:    { type: Number, default: 0 },
+  absent_deduction: { type: Number, default: 0 },
 });
 
 payrollSchema.index({ month: 1, branch_id: 1 }, { unique: true });

@@ -1,4 +1,5 @@
 const adminService = require('../service/admin.service');
+const mongoose = require('mongoose');
 
 const getDashboard = async (req, res) => {
     try {
@@ -224,6 +225,83 @@ const updateEmployeeSalaries = async (req, res) => {
   }
 };
 
+
+// Controller
+const getEmployeeList = async (req, res) => {
+  try {
+    const User = mongoose.model('user');
+    const employees = await User.find(
+      { role: { $regex: '^employee$', $options: 'i' }, status: 'Active' },
+      { user_id: 1, f_name: 1, l_name: 1, designation: 1, branch_name: 1,
+        branch_id: 1, shift: 1, salary: 1, phone: 1, email: 1, role: 1, status: 1, documents: 1 }
+    );
+    res.status(200).send({ error: false, message: 'Employee list', data: employees });
+  } catch (err) {
+    res.status(500).send({ error: true, message: err.message });
+  }
+};
+
+const updateEmployee = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const data = req.body;
+    const files = req.files;
+    const User = mongoose.model('user');
+
+    const updateData = {
+      f_name:      data.f_name,
+      l_name:      data.l_name,
+      phone:       data.phone,
+      email:       data.email,
+      role:        data.role,
+      designation: data.designation,
+      branch_id:   data.branch_id,
+      branch_name: data.branch_name,
+      shift:       data.shift,
+      salary:      Number(data.salary),
+      updated_at:  new Date()
+    };
+
+    // ✅ Update docs if new files uploaded
+    if (files?.aadhaar) {
+      const { uploadToDrive } = require('../service/google-drive.service');
+      updateData['documents.aadhaar_url'] = await uploadToDrive(
+        files.aadhaar[0],
+        process.env.GOOGLE_DRIVE_FOLDER_ID
+      );
+    }
+
+    if (files?.pan) {
+      const { uploadToDrive } = require('../service/google-drive.service');
+      updateData['documents.pan_url'] = await uploadToDrive(
+        files.pan[0],
+        process.env.GOOGLE_DRIVE_FOLDER_ID
+      );
+    }
+
+    await User.updateOne({ user_id: userId }, { $set: updateData });
+
+    res.status(200).send({
+      error: false,
+      message: 'Employee updated successfully',
+      data: null
+    });
+
+  } catch (err) {
+    res.status(500).send({ error: true, message: err.message });
+  }
+};
+
+const getAdminActivity = async (req, res) => {
+  try {
+    const { branch_id } = req.query;
+    const result = await adminService.getAdminActivity(branch_id, 50);
+    res.status(200).send({ error: false, message: 'Activity fetched', data: result });
+  } catch (err) {
+    res.status(500).send({ error: true, message: err.message });
+  }
+};
+
 module.exports = {
     getDashboard,
     createEmployee,
@@ -240,5 +318,8 @@ module.exports = {
     lockPayroll,
     unlockPayroll,
     markAsPaid,
-    updateEmployeeSalaries
+    updateEmployeeSalaries,
+    getEmployeeList,
+    updateEmployee,
+    getAdminActivity
 };

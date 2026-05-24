@@ -37,4 +37,15 @@ module.exports.setRouter = (app) => {
 
     app.post(`${baseUrl}/employee/salary/bulk-update`, adminController.updateEmployeeSalaries);
 
+    app.get(`${baseUrl}/employee/list`, adminController.getEmployeeList);
+    app.put(
+        `${baseUrl}/employee/update/:userId`,
+        upload.fields([
+            { name: 'aadhaar', maxCount: 1 },
+            { name: 'pan', maxCount: 1 }
+        ]),
+        adminController.updateEmployee
+    );
+    app.get(`${baseUrl}/activity`, adminController.getAdminActivity);
+
 }

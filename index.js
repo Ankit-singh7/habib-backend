@@ -47,6 +47,22 @@ app.use(globalErrorMiddleware.globalErrorHandler);
 app.use('/uploads',express.static('uploads'))
 app.use(express.static(path.join(__dirname, 'client')));
 
+app.use((err, req, res, next) => {
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).send({
+      error: true,
+      message: 'File too large. Maximum size is 10MB'
+    });
+  }
+  if (err.message) {
+    return res.status(400).send({
+      error: true,
+      message: err.message
+    });
+  }
+  next(err);
+});
+
 
 cron.schedule('59 59 23 * * *', function() {
   sessionModel.find({session_status:'true'}).exec((err,result) => {

@@ -1,13 +1,25 @@
 const attendanceService = require('../service/attendance.service');
+const { uploadPunchPhoto } = require('../service/google-drive.service');
 
 // 🔥 Punch API
 exports.punch = async (req, res) => {
   try {
     const { employee_id, branch_id } = req.body;
 
+    // ✅ Upload photo to drive if provided
+    let photoUrl = null;
+    if (req.file) {
+      photoUrl = await uploadPunchPhoto(
+        req.file.buffer,
+        employee_id,
+        'PUNCH'
+      );
+    }
+
     const result = await attendanceService.punch(
       employee_id,
-      branch_id
+      branch_id,
+      photoUrl
     );
 
     res.status(200).send({
@@ -104,5 +116,16 @@ exports.getEmployeePayroll = async (req, res) => {
       error: true,
       message: err.message
     });
+  }
+};
+
+exports.getEmployeeActivity = async (req, res) => {
+  try {
+    const result = await attendanceService.getEmployeeActivity(
+      req.params.employeeId, 20
+    );
+    res.status(200).send({ error: false, message: 'Activity fetched', data: result });
+  } catch (err) {
+    res.status(500).send({ error: true, message: err.message });
   }
 };

@@ -1,11 +1,12 @@
 const express = require('express');
 const attendanceController = require('../controllers/attendanceController');
-const appConfig = require("../config/appConfig")
+const appConfig = require("../config/appConfig");
+const upload = require('../middlewares/multer');
 
 module.exports.setRouter = (app) => {
     let baseUrl = `${appConfig.apiVersion}/attendance`;
 
-    app.post(`${baseUrl}/punch`, attendanceController.punch);
+    app.post(`${baseUrl}/punch`, upload.single('photo'), attendanceController.punch);
 
     app.get(`${baseUrl}/dashboard/:employeeId`, attendanceController.getDashboard);
 
@@ -14,5 +15,7 @@ module.exports.setRouter = (app) => {
     app.get(`${baseUrl}/locations`, attendanceController.getBranchesWithLocation);
 
     app.get(`${baseUrl}/employee/payroll/:employee_id`, attendanceController.getEmployeePayroll);
+
+    app.get(`${appConfig.apiVersion}/employee/activity/:employeeId`, attendanceController.getEmployeeActivity);
 
 }

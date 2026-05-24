@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const moment = require('moment');
 const { logActivity } = require('../utils/activityLogger');
+const { globalActivity } = require('../libs/loggerLib')
 
 const User = mongoose.model('user');
 const Attendance = mongoose.model('attendance');
@@ -148,7 +149,13 @@ const getEmployeeListWithStatus = async () => {
       total_hours: record && record.total_hours ? record.total_hours : 0,
       late_minutes: record && record.late_minutes ? record.late_minutes : 0,
       session_count: sessions.length,
-      reason: emp.overwrite_reason
+      reason: emp.overwrite_reason,
+      sessions: sessions.map(s => ({
+        punch_in: s.punch_in,
+        punch_out: s.punch_out,
+        duration: s.duration,
+        punch_in_photo: s.punch_in_photo || null
+      }))
     };
   });
 };
@@ -201,6 +208,15 @@ const operatorPunch = async (employee_id, operator_id) => {
       metadata: { type: 'PUNCH_IN', time: now }
     });
 
+    await globalActivity({
+      operator_id:        operator_id,
+      action_type:        'PUNCH_IN',
+      target_employee_id: employee_id,
+      branch_id:          record.branch_id || null,  // ✅ from record
+      metadata:           { type: 'PUNCH_IN', time: now }
+    });
+
+
     return { type: 'PUNCH_IN', message: 'Punch In successful' };
   }
 
@@ -241,6 +257,14 @@ const operatorPunch = async (employee_id, operator_id) => {
       metadata: { type: 'PUNCH_OUT', time: now }
     });
 
+    await globalActivity({
+      operator_id:        operator_id,
+      action_type:        'PUNCH_OUT',
+      target_employee_id: employee_id,
+      branch_id:          record.branch_id || null,  // ✅ from record
+      metadata:           { type: 'PUNCH_OUT', time: now, total_hours: totalMinutes }
+    });
+
     return {
       type: 'PUNCH_OUT',
       message: 'Punch Out successful',
@@ -264,6 +288,14 @@ const operatorPunch = async (employee_id, operator_id) => {
     action_type: 'PUNCH',
     target_employee_id: employee_id,
     metadata: { type: 'PUNCH_IN', time: now }
+  });
+
+  await globalActivity({
+    operator_id:        operator_id,
+    action_type:        'PUNCH_IN',
+    target_employee_id: employee_id,
+    branch_id:          record.branch_id || null,  // ✅ from record
+    metadata:           { type: 'PUNCH_IN', time: now }
   });
 
   return { type: 'PUNCH_IN', message: 'Punch In successful' };
@@ -299,6 +331,17 @@ const changeShift = async (employee_id, new_shift, operator_id) => {
     branch_id: employee.branch_id,
     action_type: 'SHIFT_CHANGE',
     target_employee_id: employee_id,
+    metadata: {
+      old_shift: oldShift,
+      new_shift: new_shift
+    }
+  });
+
+    await globalActivity({
+    operator_id:        operator_id,
+    action_type:        'SHIFT_CHANGE',
+    target_employee_id: employee_id,
+    branch_id:          employee.branch_id || null,  // ✅ from employee object
     metadata: {
       old_shift: oldShift,
       new_shift: new_shift
@@ -365,6 +408,17 @@ const changeBranch = async (employee_id, new_branch_id, operator_id) => {
     }
   });
 
+      await globalActivity({
+    operator_id:        operator_id,
+    action_type:        'BRANCH_CHANGE',
+    target_employee_id: employee_id,
+    branch_id:          employee.branch_id || null,  // ✅ from employee object
+    metadata: {
+      old_branch: oldBranchName,
+      new_branch: branch.branch_name
+    }
+  });
+
   return {
     message: 'Branch updated successfully',
     old_branch: oldBranchName,
@@ -408,6 +462,16 @@ const addFine = async (employee_id, amount, reason, operator_id) => {
       reason
     }
   });
+  await globalActivity({
+    operator_id:        operator_id,
+    action_type:        'FINE',
+    target_employee_id: employee_id,
+    branch_id:          employee.branch_id || null,  // ✅ from employee object
+    metadata:           { amount, reason }
+  });
+
+
+
 
   return {
     message: 'Fine added successfully',
