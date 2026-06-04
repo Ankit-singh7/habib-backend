@@ -49,7 +49,7 @@ let getAllEmployee = (req,res) => {
     
                                 isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
                             } else if(key === 'status') {
-                                isValid = isValid && user[key].toLowerCase() == filters[key].toLowerCase();
+                                isValid = isValid && user[key]?.toLowerCase() == filters[key].toLowerCase();
                             } else {
                                 isValid = isValid && user[key] == filters[key];
                             }

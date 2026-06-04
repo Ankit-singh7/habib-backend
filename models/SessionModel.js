@@ -62,4 +62,6 @@ const sessionSchema = new Schema({
   }
 })
 
+sessionSchema.index({ session_status: 1, branch_id: 1 });
+
  mongoose.model('session', sessionSchema)

@@ -45,4 +45,8 @@ let productSalesReportSchema = new Schema(
     }
 )
 
+productSalesReportSchema.index(
+    { date: 1, product_id: 1, branch_id: 1, employee_id: 1 }
+);
+
 mongoose.model('productSalesReport', productSalesReportSchema);

@@ -185,4 +185,8 @@ let billSchema = new Schema(
     }
 )
 
+billSchema.index({ createdOn: -1 });
+billSchema.index({ branch_id: 1, createdOn: -1 });
+billSchema.index({ user_id: 1, createdOn: -1 });
+
 mongoose.model('bill', billSchema);

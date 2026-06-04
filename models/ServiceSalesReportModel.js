@@ -45,4 +45,8 @@ let serviceSalesReportSchema = new Schema(
     }
 )
 
+serviceSalesReportSchema.index(
+    { date: 1, service_id: 1, branch_id: 1, employee_id: 1 }
+);
+
 mongoose.model('serviceSalesReport', serviceSalesReportSchema);

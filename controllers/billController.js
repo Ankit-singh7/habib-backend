@@ -16,116 +16,55 @@ const serviceSalesReportModel = mongoose.model('serviceSalesReport')
 const appointmentModel = mongoose.model('appointment');
 const employeeSalesModel = mongoose.model('employeeSales');
 
-let getAllBill = (req, res) => {
-    let total_sales = 0
-    let total_bill_count = 0
-    const page = req.query.current_page
-    const limit = req.query.per_page
-    const startDate = req.query.startDate
-    const endDate = req.query.endDate
-    const filters = req.query;
-    delete filters.current_page
-    delete filters.per_page
-    delete filters.startDate
-    delete filters.endDate
-
-    if(!req.query.employee_id) {
-        
-        if(startDate && endDate) {
-            let formatted_sd = moment(startDate,'DD-MM-YYYY')
-            let formatted_ed = moment(endDate,'DD-MM-YYYY').add(1,'day')
-            billModel.find({'createdOn':{ $gte:formatted_sd.format(), $lte:formatted_ed.format()}}).sort({ _id: -1 })
-                .lean()
-                .exec((err, result) => {
-                    if (err) {
-                        let apiResponse = response.generate(true, 'Failed To Find Food Sub-Category Details', 500, null)
-                        res.send(apiResponse)
-                    } else if (check.isEmpty(result)) {
-                        let apiResponse = response.generate(true, 'No Data Found', 404, null)
-                        res.send(apiResponse)
-                    } else {
-                        const filteredUsers = result.filter(user => {
-                            let isValid = true;
-                            for (key in filters) {
-                                if (key === 'createdOn') {
-        
-                                    // isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
-                                } else {
-                                    isValid = isValid && user[key] == filters[key];
-                                }
-        
-                            }
-                            return isValid;
-                        });
-                        if(filteredUsers.length>0) {
-                            for(let item of filteredUsers) {
-                                total_sales = total_sales + item.total_price
-                            }
-    
-                          } else {
-                                total_sales = 0;
-                          }
-                        total_bill_count = filteredUsers.length
-                        const startIndex = (page - 1) * limit;
-                        const endIndex = page * limit
-                        let total = `${total_sales}-${total_bill_count}`;
-                        let billList = filteredUsers.slice(startIndex, endIndex)
-                        let newResult = { total: total, result: billList }
-                        let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
-                        res.send(apiResponse)
-                    }
-                })
-        } else {
-            billModel.find().sort({ _id: -1 })
-                .lean()
-                .exec((err, result) => {
-                    if (err) {
-                        let apiResponse = response.generate(true, 'Failed To Find Food Sub-Category Details', 500, null)
-                        res.send(apiResponse)
-                    } else if (check.isEmpty(result)) {
-                        logger.info('No Data Found', 'Bill Controller: getAllBill')
-                        let apiResponse = response.generate(true, 'No Data Found', 404, null)
-                        res.send(apiResponse)
-                    } else {
-                        const filteredUsers = result.filter(user => {
-                            let isValid = true;
-                            for (key in filters) {
-                                if (key === 'createdOn') {
-        
-                                    isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
-                                } else {
-                                    isValid = isValid && user[key] == filters[key];
-                                }
-        
-                            }
-                            return isValid;
-                        });
-                        if(filteredUsers.length>0) {
-                            for(let item of filteredUsers) {
-                                total_sales = total_sales + item.total_price
-                            }
-    
-                          } else {
-                                total_sales = 0;
-                          }
-                        total_bill_count = filteredUsers.length
-                        let total = `${total_sales}-${total_bill_count}`;
-                        const startIndex = (page - 1) * limit;
-                        const endIndex = page * limit
-                        let billList = filteredUsers.slice(startIndex, endIndex)
-                        let newResult = { total: total, result: billList }
-                        let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
-                        res.send(apiResponse)
-                    }
-                })
+let getAllBill = async (req, res) => {
+    try {
+        if (req.query.employee_id) {
+            return getEmployeeSales(req, res, req.query.startDate, req.query.endDate);
         }
-    } else {
-        getEmployeeSales(req,res,startDate,endDate)
+
+        const page = parseInt(req.query.current_page) || 1;
+        const limit = parseInt(req.query.per_page) || 10;
+        const { startDate, endDate, current_page, per_page, ...filters } = req.query;
+
+        let dbQuery = {};
+
+        const sd = startDate ? moment(startDate, 'DD-MM-YYYY') : moment().startOf('day');
+        const ed = endDate ? moment(endDate, 'DD-MM-YYYY').add(1, 'day') : moment().endOf('day');
+
+        dbQuery.createdOn = {
+            $gte: sd.format(),
+            $lte: ed.format()
+        };
+
+        for (const key of Object.keys(filters)) {
+            if (key === 'createdOn') continue;
+            if (filters[key] !== undefined && filters[key] !== '') {
+                dbQuery[key] = filters[key];
+            }
+        }
+
+        const skip = (page - 1) * limit;
+
+        const [bills, total_bill_count, sumResult] = await Promise.all([
+            billModel.find(dbQuery).sort({ _id: -1 }).skip(skip).limit(limit).lean(),
+            billModel.countDocuments(dbQuery),
+            billModel.find(dbQuery).select('total_price').lean()
+        ]);
+
+        if (!bills || bills.length === 0) {
+            return res.send(response.generate(true, 'No Data Found', 404, null));
+        }
+
+        const total_sales = sumResult.reduce((sum, item) => sum + (item.total_price || 0), 0);
+        const total = `${total_sales}-${total_bill_count}`;
+
+        res.send(response.generate(false, 'All Bills Found', 200, { total, result: bills }));
+
+    } catch (err) {
+        logger.error(err.message, 'Bill Controller: getAllBill');
+        res.send(response.generate(true, 'Failed To Find Bills', 500, null));
     }
-
-
-}
-
+};
 
 
 let getAllCustomer = (req, res) => {
@@ -181,157 +120,52 @@ let getAllCustomerNumber = (req, res) => {
 
 
 
- function getEmployeeSales(req, res,sd,ed){
-    let employeeSalesList = [];
-    const page = req.query.current_page
-    const limit = req.query.per_page
-    const startDate = sd?sd:''
-    const endDate = ed?ed:''
-    const employee_id = req.query.employee_id
-    const filters = req.query;
-    delete filters.current_page
-    delete filters.employee_id
-    delete filters.per_page
+async function getEmployeeSales(req, res, sd, ed) {
+    try {
+        const employee_id = req.query.employee_id;
+        const { startDate, endDate, current_page, per_page, employee_id: _eid, ...filters } = req.query;
 
-    if(startDate && endDate) {
-        let formatted_sd = moment(startDate,'DD-MM-YYYY')
-        let formatted_ed = moment(endDate,'DD-MM-YYYY').add(1,'day')
-        billModel.find({'createdOn':{ $gte:formatted_sd.format(), $lte:formatted_ed.format()}}).sort({ _id: -1 })
-            .lean()
-            .exec((err, result) => {
-                if (err) {
-                    let apiResponse = response.generate(true, 'Failed To Find Food Sub-Category Details', 500, null)
-                    res.send(apiResponse)
-                } else if (check.isEmpty(result)) {
-                    logger.info('No Data Found', 'Bill Controller: getAllBill')
-                    let apiResponse = response.generate(true, 'No Data Found', 404, null)
-                    res.send(apiResponse)
-                } else {
-                    const filteredUsers = result.filter(user => {
-                        let isValid = true;
-                        for (key in filters) {
-                            if (key === 'createdOn') {
-    
-                                isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
-                            } else {
-                                isValid = isValid && user[key] == filters[key];
-                            }
-    
-                        }
-                        return isValid;
-                    });
-                    let total_sales = 0;
-                    let total_bill_count = result.length;
-                    let billList = filteredUsers
-                    for(let item of billList) {
-                        let products = [];
-                        let services = [];
-                        let productsArr = JSON.parse(JSON.stringify(item.products));
-                        let servicesArr = JSON.parse(JSON.stringify(item.services));
+        let dbQuery = {};
+        if (sd && ed) {
+            dbQuery.createdOn = {
+                $gte: moment(sd, 'DD-MM-YYYY').toDate(),
+                $lte: moment(ed, 'DD-MM-YYYY').add(1, 'day').toDate()
+            };
+        }
+        for (const key of Object.keys(filters)) {
+            if (filters[key] !== undefined && filters[key] !== '') {
+                dbQuery[key] = filters[key];
+            }
+        }
 
-                        for(let product of productsArr) {
-                            if(product.employee_id === employee_id) {
-                                total_sales = total_sales + product.total
-                                 products.push(product)
-                            }
-                        }
-                        for(let service of servicesArr) {
-                            if(service.employee_id === employee_id) {
-                                total_sales = total_sales + service.total
-                                services.push(service)
-                            }
-                        }
+        const bills = await billModel.find(dbQuery).sort({ _id: -1 }).lean();
 
-                        if(products.length > 0 || services.length > 0) {
-       
-                            delete item.products
-                            delete item.services
-                            item.employee_id = employee_id
-                            item.products = products
-                            item.services = services
-                            employeeSalesList.push(item)
-                        }
-                        
-                    }
+        if (!bills || bills.length === 0) {
+            return res.send(response.generate(true, 'No Data Found', 404, null));
+        }
 
-                    let total_r  = `${total_sales}-${total_bill_count}`;
+        let total_sales = 0;
+        let employeeSalesList = [];
 
-                    let newResult = { total: total_r, result: employeeSalesList }
-                    let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
-                    res.send(apiResponse)
-                }
-            })
-    } else {
-        billModel.find().sort({ _id: -1 })
-            .lean()
-            .exec((err, result) => {
-                if (err) {
-                    let apiResponse = response.generate(true, 'Failed To Find Food Sub-Category Details', 500, null)
-                    res.send(apiResponse)
-                } else if (check.isEmpty(result)) {
-                    let apiResponse = response.generate(true, 'No Data Found', 404, null)
-                    res.send(apiResponse)
-                } else {
-                    const filteredUsers = result.filter(user => {
-                        let isValid = true;
-                        for (key in filters) {
-                            if (key === 'createdOn') {  
-                                isValid = isValid && moment(user[key]).format('YYYY-MM-DD') == filters[key];
-                            } else {
-                                isValid = isValid && user[key] == filters[key];
-                            }
-    
-                        }
-                        return isValid;
-                    });
-                    const startIndex = (page - 1) * limit;
-                    const endIndex = page * limit
-                
-          // const startIndex = (page - 1) * limit;
-                    // const endIndex = page * limit
-                    let total_sales = 0;
-                    let total_bill_count = result.length;
-                    // let billList = filteredUsers.slice(startIndex, endIndex)
-                    let billList = filteredUsers
-                    for(let item of billList) {
-                        let products = [];
-                        let services = [];
-                        let productsArr = JSON.parse(JSON.stringify(item.products));
-                        let servicesArr = JSON.parse(JSON.stringify(item.services));
-                        for(let product of productsArr) {
-                            if(product.employee_id === employee_id) {
-                                total_sales = total_sales + product.total
-                                 products.push(product)
-                            }
-                        }
-                        for(let service of servicesArr) {
-                            if(service.employee_id === employee_id) {
-                                total_sales = total_sales + service.total
-                                services.push(service)
-                            }
-                        }
-                   
-                        if(products.length>0 || services.length > 0) {
+        for (let item of bills) {
+            const products = (item.products || []).filter(p => p.employee_id === employee_id);
+            const services = (item.services || []).filter(s => s.employee_id === employee_id);
 
-                            delete item.products
-                            delete item.services
-                            item.employee_id = employee_id
-                            item.products = products
-                            item.services = services
-                            employeeSalesList.push(item)
-                        }
-                        
-                    }
+            products.forEach(p => total_sales += p.total || 0);
+            services.forEach(s => total_sales += s.total || 0);
 
-                    let total_r = `${total_sales}-${total_bill_count}`;
-                    
-                    let newResult = { total: total_r, result: employeeSalesList }
-                    let apiResponse = response.generate(false, 'All Bills Found', 200, newResult)
-                    res.send(apiResponse)
-                }
-            })
+            if (products.length > 0 || services.length > 0) {
+                employeeSalesList.push({ ...item, products, services, employee_id });
+            }
+        }
+
+        const total_r = `${total_sales}-${bills.length}`;
+        res.send(response.generate(false, 'All Bills Found', 200, { total: total_r, result: employeeSalesList }));
+
+    } catch (err) {
+        logger.error(err.message, 'Bill Controller: getEmployeeSales');
+        res.send(response.generate(true, 'Failed To Find Bills', 500, null));
     }
-
 }
 
 
@@ -417,162 +251,134 @@ let createBill = (req, res) => {
         })
     }
 
-
-
     newBill.save((err, result) => {
         if (err) {
             let apiResponse = response.generate(true, 'Failed To create new Bill', 500, null)
             res.send(apiResponse)
         } else {
-
-            if(req.body.dual_payment_mode === false  || req.body.dual_payment_mode === 'false' ) {
-
-                if(req.body.payment_mode_1 === 'Cash') {
-                    sessionModel.findOne({'session_status': 'true'})
-                    .select('-__v -_id')
-                    .lean()
-                    .exec((err, result) => {
-                        if (err) {
-                             let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
-                        } else if (check.isEmpty(result)) {
-                             let apiResponse = response.generate(true, 'No Detail Found', 404, null)
-                        } else {
-                           let option = {
-                               drawer_balance: Number(result.drawer_balance) + Number(req.body.total_price)
-                           }
-                           sessionModel.updateOne({session_id: result.session_id},option,{multi:true}).exec((err,result) => {
-                           })
-                        
-                        }
-                     })
-                }
-            } else if(req.body.dual_payment_mode === true  || req.body.dual_payment_mode === 'true' ){
-                    if(req.body.payment_mode_1 === 'Cash' || req.body.payment_mode_2 === 'Cash') {
-
-                        sessionModel.findOne({'session_status': 'true'})
-                        .select('-__v -_id')
-                        .lean()
-                        .exec((err, result) => {
-                            if (err) {
-                                 let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
-                            } else if (check.isEmpty(result)) {
-                                 let apiResponse = response.generate(true, 'No Detail Found', 404, null)
-                            } else {
-                               let option;
-                               if(req.body.payment_mode_1 === 'Cash' && req.body.payment_mode_2 !== 'Cash') {
-                                   option = {
-                                       drawer_balance: Number(result.drawer_balance) + Number(req.body.split_amount_1)
-                                   }
-                                   
-                               } else if(req.body.payment_mode_1 !== 'Cash' && req.body.payment_mode_2 === 'Cash') {
-                                option = {
-                                    drawer_balance: Number(result.drawer_balance) + Number(req.body.split_amount_2)
-                                }
-                               } else if(req.body.payment_mode_1 === 'Cash' && req.body.payment_mode_2 === 'Cash') {
-                                option = {
-                                    drawer_balance: Number(result.drawer_balance) + Number(req.body.total_price)
-                                }
-                               }
-                               sessionModel.updateOne({session_id: result.session_id},option,{multi:true}).exec((err,result) => {
-                               })
-                            
-                            }
-                         })
-                    }
-                
-            }
-
-            if(req.body.appointment_id){
-                appointmentModel.deleteMany({'appointment_id': req.body.appointment_id}).exec((err,result) => {
-                })
-            }
             let apiResponse = response.generate(false, 'Bill Successfully created', 200, result)
-            if(req.body.payment_mode === 'Cash') {
-                sessionModel.findOne({'session_status': 'true','branch_id': req.body.branch_id})
-                .select('-__v -_id')
-                .lean()
-                .exec((err, result) => {
-                    if (err) {
-                         let apiResponse = response.generate(true, 'Failed To Find Details', 500, null)
-                    } else if (check.isEmpty(result)) {
-                         let apiResponse = response.generate(true, 'No Detail Found', 404, null)
-                    } else {
-                       let option = {
-                           drawer_balance: Number(result.drawer_balance) + Number(req.body.total_price)
-                       }
-                       sessionModel.updateOne({session_id: result.session_id},option,{multi:true}).exec((err,result) => {
-                       })
-                    
-                    }
-                 })
-            }
-            for(let item of req.body.products) {
-                productSalesReportModel.findOne({'date': time.getNormalTime(),'product_id': item.product_id,'branch_id': req.body.branch_id,'employee_id': item.employee_id}).exec((err,result) => {
-                   if(err){
-                   } else if (check.isEmpty(result)) {
-                       let sales = new productSalesReportModel({
-                        sales_report_id: shortid.generate(),
-                        date: time.getNormalTime(),
-                        product_name: item.product_name,
-                        product_id: item.product_id,
-                        branch_id: req.body.branch_id,
-                        branch_name: req.body.branch_name,
-                        employee_id: item.employee_id,
-                        employee_name: item.employee_name,
-                        quantity: Number(item.quantity)
-                       })
-                       sales.save((err,result) => {
-                       })
-                   } else {
-                       let obj = {
-                          quantity: Number(result.quantity) + Number(item.quantity) 
-                       }
-                       productSalesReportModel.updateOne({'sales_report_id': result.sales_report_id},obj,{multi:true}).exec((err,result) => {
-                           if(err) {
-                           } else {
-                               let apiResponse = response.generate(false, 'Bill Created Successfully', 200, null)
-                               res.send(apiResponse)
-                           }
-                       })
-                   }
-               })
-            }
-            for(let item of req.body.services) {
-                serviceSalesReportModel.findOne({'date': time.getNormalTime(),'service_id': item.product_id,'branch_id': req.body.branch_id,'employee_id':item.employee_id}).exec((err,result) => {
-                   if(err){
-                   } else if (check.isEmpty(result)) {
-                       let sales = new serviceSalesReportModel({
-                        sales_report_id: shortid.generate(),
-                        date: time.getNormalTime(),
-                        service_name: item.service_name,
-                        service_id: item.service_id,
-                        branch_id: req.body.branch_id,
-                        branch_name: req.body.branch_name,
-                        employee_id: item.employee_id,
-                        employee_name: item.employee_name,
-                        quantity: Number(item.quantity)
-                       })
-                       sales.save((err,result) => {
-                           if(err) {
-                           }
-                       })
-                   } else {
-                       let obj = {
-                          quantity: Number(result.quantity) + Number(item.quantity) 
-                       }
-                       serviceSalesReportModel.updateOne({'sales_report_id': result.sales_report_id},obj,{multi:true}).exec((err,result) => {
-                           if(err) {
-                           } else {
-                               let apiResponse = response.generate(false, 'Bill Created Successfully', 200, null)
-                            }
-                        })
-                    }
-                })
-            }
             res.send(apiResponse)
+
+            setImmediate(() => {
+                let postProcess = Promise.resolve()
+
+                if(req.body.dual_payment_mode === false  || req.body.dual_payment_mode === 'false' ) {
+                    if(req.body.payment_mode_1 === 'Cash') {
+                        postProcess = postProcess.then(() =>
+                            sessionModel.updateOne(
+                                { session_status: 'true' },
+                                { $inc: { drawer_balance: Number(req.body.total_price) } }
+                            ).exec()
+                        )
+                    }
+                } else if(req.body.dual_payment_mode === true  || req.body.dual_payment_mode === 'true' ){
+                    if(req.body.payment_mode_1 === 'Cash' || req.body.payment_mode_2 === 'Cash') {
+                        let cashAmount = 0
+                        if(req.body.payment_mode_1 === 'Cash' && req.body.payment_mode_2 !== 'Cash') {
+                            cashAmount = Number(req.body.split_amount_1)
+                        } else if(req.body.payment_mode_1 !== 'Cash' && req.body.payment_mode_2 === 'Cash') {
+                            cashAmount = Number(req.body.split_amount_2)
+                        } else if(req.body.payment_mode_1 === 'Cash' && req.body.payment_mode_2 === 'Cash') {
+                            cashAmount = Number(req.body.total_price)
+                        }
+                        if (cashAmount) {
+                            postProcess = postProcess.then(() =>
+                                sessionModel.updateOne(
+                                    { session_status: 'true' },
+                                    { $inc: { drawer_balance: cashAmount } }
+                                ).exec()
+                            )
+                        }
+                    }
+                }
+
+                if(req.body.payment_mode === 'Cash') {
+                    postProcess = postProcess.then(() =>
+                        sessionModel.updateOne(
+                            { session_status: 'true', branch_id: req.body.branch_id },
+                            { $inc: { drawer_balance: Number(req.body.total_price) } }
+                        ).exec()
+                    )
+                }
+
+                if(req.body.appointment_id){
+                    postProcess = postProcess.then(() =>
+                        appointmentModel.deleteMany({'appointment_id': req.body.appointment_id}).exec()
+                    )
+                }
+
+                const reportDate = time.getNormalTime()
+                const products = Array.isArray(req.body.products) ? req.body.products : []
+                const services = Array.isArray(req.body.services) ? req.body.services : []
+                const reportTasks = []
+
+                for(let item of products) {
+                    reportTasks.push(
+                        productSalesReportModel.findOneAndUpdate(
+                            {
+                                date: reportDate,
+                                product_id: item.product_id,
+                                branch_id: req.body.branch_id,
+                                employee_id: item.employee_id
+                            },
+                            {
+                                $inc: { quantity: Number(item.quantity) },
+                                $setOnInsert: {
+                                    sales_report_id: shortid.generate(),
+                                    date: reportDate,
+                                    product_name: item.product_name,
+                                    product_id: item.product_id,
+                                    branch_id: req.body.branch_id,
+                                    branch_name: req.body.branch_name,
+                                    employee_id: item.employee_id,
+                                    employee_name: item.employee_name
+                                }
+                            },
+                            { upsert: true, new: true }
+                        ).exec()
+                    )
+                }
+
+                for(let item of services) {
+                    reportTasks.push(
+                        serviceSalesReportModel.findOneAndUpdate(
+                            {
+                                date: reportDate,
+                                service_id: item.product_id,
+                                branch_id: req.body.branch_id,
+                                employee_id: item.employee_id
+                            },
+                            {
+                                $inc: { quantity: Number(item.quantity) },
+                                $setOnInsert: {
+                                    sales_report_id: shortid.generate(),
+                                    date: reportDate,
+                                    service_name: item.service_name,
+                                    service_id: item.service_id,
+                                    branch_id: req.body.branch_id,
+                                    branch_name: req.body.branch_name,
+                                    employee_id: item.employee_id,
+                                    employee_name: item.employee_name
+                                }
+                            },
+                            { upsert: true, new: true }
+                        ).exec()
+                    )
+                }
+
+                if (reportTasks.length > 0) {
+                    postProcess = postProcess.then(() => Promise.all(reportTasks))
+                }
+
+                postProcess.catch((postErr) => {
+                    logger.error(
+                        postErr.message || String(postErr),
+                        'Bill Controller: createBill post-process'
+                    )
+                })
+            })
         }
     })
-
 }
 
 
