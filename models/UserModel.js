@@ -68,6 +68,10 @@ let userSchema = new Schema(
       type: Date,
       default: ""
     },
+    shift_time: {
+      type: String,
+      default: ''
+    }
   })
 
 userSchema.index({ branch_id: 1, role: 1, status: 1 });

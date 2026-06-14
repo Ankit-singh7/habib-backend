@@ -27,6 +27,11 @@ let attendanceSchema = new Schema({
     type: String
   },
 
+  shift_time: {
+    type: String,
+    default: null
+  },
+
   attendance_date: {
     type: String, // "YYYY-MM-DD"
     required: true,

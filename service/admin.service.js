@@ -8,23 +8,11 @@ const Fine = mongoose.model('fine');
 const Salary = mongoose.model('salary');
 const { uploadToDrive, createEmployeeFolder, createRootFolder } = require('../service/google-drive.service');
 let ROOT_FOLDER_ID = "1W5m6_WUZDGV_WbusPQtCLQe9rYNBSX4k";
-const Deduction = mongoose.model('deduction');
 const Incentive = mongoose.model('incentive');
 const Advance = mongoose.model('advance');
-const Payroll = mongoose.model('payroll');
 const { globalActivity } = require('../libs/loggerLib')
-
-
-const calculateDeduction = (lateMinutes, rules = []) => {
-  let deduction = 0;
-  for (let rule of rules) {
-    if (lateMinutes >= rule.late_minutes) {
-      deduction = rule.deduction;
-    }
-  }
-  return deduction;
-};
-
+const PayrollAdjustment = mongoose.model('payroll_adjustment');
+const EmployeePayroll = mongoose.model('employee_payroll');
 
 const getAdminDashboard = async (branch_id) => {
 
@@ -169,6 +157,7 @@ const createEmployee = async (data, files) => {
     shift: data.shift,
     salary: data.salary,
     status: "Active",
+    shift_time: data.shift_time,
 
     documents: {
       aadhaar_url: aadhaarUrl,
@@ -184,113 +173,337 @@ const createEmployee = async (data, files) => {
 // ============================================
 // 🔥 ADMIN OVERWRITE ATTENDANCE
 // ============================================
-const adminOverwriteAttendance = async (employee_id, branch_id, admin_id, date, in_time, out_time) => {
+const adminOverwriteAttendance = async (
+  employee_id,
+  branch_id,
+  admin_id,
+  date,
+  sessions = []
+) => {
 
-  // ✅ Normalize date — admin can punch for any date
   const attendance_date = moment(date).format('YYYY-MM-DD');
 
-  // ✅ Build datetime from date + time
+  // ==========================================
+  // Employee Details
+  // ==========================================
+
+  const employee = await User.findOne(
+    { user_id: employee_id },
+    {
+      shift_time: 1
+    }
+  );
+
+  // ==========================================
+  // Build DateTime Helper
+  // ==========================================
+
   const buildDateTime = (dateStr, timeStr) => {
-    if (!timeStr || timeStr.trim() === '') return null;
+
+    if (!timeStr || timeStr.trim() === '') {
+      return null;
+    }
+
     const [hours, minutes] = timeStr.split(':');
-    if (!hours || !minutes) return null;
-    const dt = moment(dateStr, 'YYYY-MM-DD').toDate();
-    dt.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+    if (!hours || !minutes) {
+      return null;
+    }
+
+    const dt = moment(
+      dateStr,
+      'YYYY-MM-DD'
+    ).toDate();
+
+    dt.setHours(
+      parseInt(hours),
+      parseInt(minutes),
+      0,
+      0
+    );
+
     return dt;
   };
 
-  const punchIn = buildDateTime(attendance_date, in_time);
-  const punchOut = buildDateTime(attendance_date, out_time);
+  // ==========================================
+  // Build Sessions
+  // ==========================================
 
-  // ✅ Calculate late minutes (vs 9 AM shift start)
-  let lateMinutes = 0;
-  if (punchIn) {
-    const shiftStart = moment(attendance_date).startOf('day').add(9, 'hours');
-    const actualIn = moment(punchIn);
-    if (actualIn.isAfter(shiftStart)) {
-      lateMinutes = actualIn.diff(shiftStart, 'minutes');
-    }
-  }
+  const attendanceSessions = sessions.map(
+    (session) => {
 
-  // ✅ Calculate deduction
-  const deductionConfig = await Deduction.findOne({});
-  const deductionAmount = calculateDeduction(
-    lateMinutes,
-    deductionConfig && deductionConfig.rules ? deductionConfig.rules : []
-  );
+      const punchIn = buildDateTime(
+        attendance_date,
+        session.in
+      );
 
-  // ✅ Calculate duration
-  let duration = 0;
-  if (punchIn && punchOut) {
-    duration = Math.floor(
-      (punchOut.getTime() - punchIn.getTime()) / (1000 * 60)
-    );
-  }
+      const punchOut = buildDateTime(
+        attendance_date,
+        session.out
+      );
 
-  // ✅ Find existing record for that date
-  let record = await Attendance.findOne({ employee_id, attendance_date });
+      let duration = 0;
 
-  // ============================================
-  // 👉 NO RECORD — Create new
-  // ============================================
-  if (!record) {
-    record = new Attendance({
-      attendance_id: new mongoose.Types.ObjectId().toString(),
-      employee_id,
-      branch_id,
-      attendance_date,
-      sessions: [{
+      if (punchIn && punchOut) {
+
+        duration = Math.floor(
+          (
+            punchOut.getTime() -
+            punchIn.getTime()
+          ) /
+          (1000 * 60)
+        );
+      }
+
+      return {
         punch_in: punchIn,
         punch_out: punchOut,
         duration
-      }],
-      total_hours: duration,
-      status: (lateMinutes > 0 ? 'LATE' : 'PRESENT'),
-      late_minutes: lateMinutes,
-      deduction_amount: deductionAmount,
-      is_active: punchIn && !punchOut,  // active if punch in but no punch out
-      punch_by: 'ADMIN',
-      overwritten_by: admin_id,
+      };
+    }
+  );
+
+  // ==========================================
+  // First Punch In
+  // ==========================================
+
+  const firstPunchIn =
+    attendanceSessions.find(
+      s => s.punch_in
+    )?.punch_in || null;
+
+  // ==========================================
+  // Active Session
+  // ==========================================
+
+  const activeSession =
+    attendanceSessions.find(
+      s =>
+        s.punch_in &&
+        !s.punch_out
+    );
+
+  // ==========================================
+  // Total Hours
+  // ==========================================
+
+  const totalHours =
+    attendanceSessions.reduce(
+      (sum, session) =>
+        sum + (session.duration || 0),
+      0
+    );
+
+  // ==========================================
+  // Late Minutes
+  // ==========================================
+
+  let lateMinutes = 0;
+
+  if (
+    firstPunchIn &&
+    employee?.shift_time &&
+    employee.shift_time.trim() !== ''
+  ) {
+
+    const [hours, minutes] =
+      employee.shift_time
+        .split(':')
+        .map(Number);
+
+    const shiftStart = moment(
+      attendance_date
+    )
+      .startOf('day')
+      .add(hours, 'hours')
+      .add(minutes, 'minutes');
+
+    const actualIn =
+      moment(firstPunchIn);
+
+    if (actualIn.isAfter(shiftStart)) {
+
+      lateMinutes =
+        actualIn.diff(
+          shiftStart,
+          'minutes'
+        );
+    }
+  }
+
+  // ==========================================
+  // Deduction
+  // ==========================================
+
+  let deductionAmount = 0;
+
+  if (employee?.shift_time) {
+
+    const deductionConfig =
+      await Deduction.findOne({});
+
+    deductionAmount =
+      calculateDeduction(
+        lateMinutes,
+        deductionConfig?.rules || []
+      );
+  }
+
+  // ==========================================
+  // Status
+  // ==========================================
+
+  let status = 'ABSENT';
+
+  if (
+    attendanceSessions.length > 0
+  ) {
+
+    status =
+      lateMinutes > 0
+        ? 'LATE'
+        : 'PRESENT';
+  }
+
+  // ==========================================
+  // Existing Record
+  // ==========================================
+
+  let record =
+    await Attendance.findOne({
+      employee_id,
+      attendance_date
     });
 
-    await globalActivity({
-      operator_id:        'admin',
-      action_type:        'OVERWRITE_ATTENDANCE',
-      target_employee_id: employee_id,
-      metadata:           { date, in_time, out_time }
+  // ==========================================
+  // Create
+  // ==========================================
+
+  if (!record) {
+
+    record = new Attendance({
+
+      attendance_id:
+        new mongoose.Types.ObjectId().toString(),
+
+      employee_id,
+
+      branch_id,
+
+      attendance_date,
+
+      shift_time:
+        employee?.shift_time || null,
+
+      sessions:
+        attendanceSessions,
+
+      total_hours:
+        totalHours,
+
+      status,
+
+      late_minutes:
+        lateMinutes,
+
+      deduction_amount:
+        deductionAmount,
+
+      is_active:
+        !!activeSession,
+
+      punch_by:
+        'ADMIN',
+
+      overwritten_by:
+        admin_id
     });
 
     await record.save();
 
+    await globalActivity({
+      operator_id: 'admin',
+
+      action_type:
+        'OVERWRITE_ATTENDANCE',
+
+      target_employee_id:
+        employee_id,
+
+      metadata: {
+        attendance_date,
+        sessions_count:
+          attendanceSessions.length
+      }
+    });
+
     return {
       type: 'CREATED',
-      message: 'Attendance created successfully'
+      message:
+        'Attendance created successfully'
     };
   }
 
-  // ============================================
-  // 👉 RECORD EXISTS — Overwrite sessions
-  // ============================================
-  record.sessions = [{
-    punch_in: punchIn,
-    punch_out: punchOut,
-    duration
-  }];
-  record.total_hours = duration;
-  record.status = (lateMinutes > 0 ? 'LATE' : 'PRESENT');
-  record.late_minutes = lateMinutes;
-  record.deduction_amount = deductionAmount;
-  record.is_active = punchIn && !punchOut;
-  record.punch_by = 'ADMIN';
-  record.overwritten_by = admin_id;
-  record.updated_at = new Date();
-  record.markModified('sessions'); // ✅ force Mongoose to detect change
+  // ==========================================
+  // Update Existing
+  // ==========================================
+
+  record.shift_time =
+    employee?.shift_time || null;
+
+  record.sessions =
+    attendanceSessions;
+
+  record.total_hours =
+    totalHours;
+
+  record.status =
+    status;
+
+  record.late_minutes =
+    lateMinutes;
+
+  record.deduction_amount =
+    deductionAmount;
+
+  record.is_active =
+    !!activeSession;
+
+  record.punch_by =
+    'ADMIN';
+
+  record.overwritten_by =
+    admin_id;
+
+  record.updated_at =
+    new Date();
+
+  record.markModified(
+    'sessions'
+  );
 
   await record.save();
 
+  await globalActivity({
+    operator_id: 'admin',
+
+    action_type:
+      'OVERWRITE_ATTENDANCE',
+
+    target_employee_id:
+      employee_id,
+
+    metadata: {
+      attendance_date,
+      sessions_count:
+        attendanceSessions.length
+    }
+  });
+
   return {
     type: 'OVERWRITTEN',
-    message: 'Attendance overwritten successfully'
+    message:
+      'Attendance overwritten successfully'
   };
 };
 
@@ -390,235 +603,663 @@ const removeAdvance = async (advance_id) => {
   return await Advance.findOneAndDelete({ advance_id });
 };
 
+// NEW FUNCTIONS
 
+const savePayrollAdjustment = async (
+  employee_id,
+  branch_id,
+  month,
+  paid_leave_days,
+  festival_days,
+  updated_by
+) => {
 
-
-
-// ============================================
-// 🔥 GENERATE PAYROLL
-// ============================================
-const generatePayroll = async (month, branch_id, admin_id) => {
-  // ✅ Check if payroll already exists
-  const existing = await Payroll.findOne({ month, branch_id: branch_id || '' });
-  if (existing && existing.status !== 'DRAFT') {
-    throw new Error(`Payroll already ${existing.status} for this month`);
-  }
-
-  // ✅ Get all active employees for branch
-  const empQuery = {
-    role: { $regex: '^employee$', $options: 'i' },
-    status: { $regex: '^active$', $options: 'i' }
-  };
-  if (branch_id) empQuery.branch_id = branch_id;
-
-  const employees = await User.find(empQuery, {
-    user_id: 1, f_name: 1, l_name: 1,
-    salary: 1, branch_id: 1, branch_name: 1
+  let adjustment = await PayrollAdjustment.findOne({
+    employee_id,
+    month
   });
 
-  const employeeIds = employees.map(e => e.user_id);
+  if (adjustment) {
 
-  const employeesWithoutSalary = employees.filter(e => !e.salary);
+    adjustment.paid_leave_days = paid_leave_days;
+    adjustment.festival_days = festival_days;
+    adjustment.updated_by = updated_by;
+    adjustment.updated_at = new Date();
 
-  if (employeesWithoutSalary.length > 0) {
+    await adjustment.save();
+
+    return adjustment;
+  }
+
+  adjustment = new PayrollAdjustment({
+    adjustment_id: new mongoose.Types.ObjectId().toString(),
+    employee_id,
+    branch_id,
+    month,
+    paid_leave_days,
+    festival_days,
+    updated_by
+  });
+
+  await adjustment.save();
+
+  return adjustment;
+};
+
+
+const getEmployeePayrollPreview = async (
+  employee_id,
+  month
+) => {
+
+  const employee = await User.findOne({
+    user_id: employee_id
+  });
+
+  if (!employee) {
+    throw new Error('Employee not found');
+  }
+
+  if (!employee.salary) {
     throw new Error(
-      `Salary missing for ${employeesWithoutSalary.length} employees`, employeesWithoutSalary.length
+      `${employee.f_name} ${employee.l_name} salary not configured`
     );
   }
 
-  // ✅ Date range for the month
-  const start = moment(month, 'YYYY-MM').startOf('month').format('YYYY-MM-DD');
-  const end = moment(month, 'YYYY-MM').endOf('month').format('YYYY-MM-DD');
+  const startDate = moment(month + '-01')
+    .startOf('month')
+    .format('YYYY-MM-DD');
 
-  // ✅ Fetch all data in parallel
-  const [attendanceRecords, fines, incentives, advances] = await Promise.all([
-    Attendance.find({
-      employee_id: { $in: employeeIds },
-      attendance_date: { $gte: start, $lte: end }
-    }),
-    Fine.find({
-      employee_id: { $in: employeeIds },
-      salary_processed: false,
-      $or: [
-        { apply_to: 'CURRENT', created_at: { $gte: new Date(start), $lte: new Date(end) } },
-        { apply_to: 'NEXT' }
-      ]
-    }),
-    Incentive.find({ employee_id: { $in: employeeIds }, month }),
-    Advance.find({ employee_id: { $in: employeeIds }, month })
-  ]);
+  const endDate = moment(month + '-01')
+    .endOf('month')
+    .format('YYYY-MM-DD');
 
-  // ✅ Build lookup maps
-  const attMap = {};
-  attendanceRecords.forEach(a => {
-    if (!attMap[a.employee_id]) attMap[a.employee_id] = [];
-    attMap[a.employee_id].push(a);
+  const attendances = await Attendance.find({
+    employee_id,
+    attendance_date: {
+      $gte: startDate,
+      $lte: endDate
+    }
   });
 
-  const fineMap = {};
-  fines.forEach(f => {
-    fineMap[f.employee_id] = (fineMap[f.employee_id] || 0) + f.amount;
-  });
+const workedMinutes = attendances.reduce(
+  (totalMinutes, attendance) => {
 
-  const incentiveMap = {};
-  incentives.forEach(i => { incentiveMap[i.employee_id] = i.amount || 0; });
+    const sessionMinutes =
+      (attendance.sessions || []).reduce(
+        (sessionTotal, session) => {
 
-  const advanceMap = {};
-  advances.forEach(a => { advanceMap[a.employee_id] = a.amount || 0; });
+          return (
+            sessionTotal +
+            Number(session.duration || 0)
+          );
 
-  // ✅ Calculate working days in month
-  const totalWorkingDays = calculateWorkingDays(start, end);
+        },
+        0
+      );
 
-  // ✅ Build payroll per employee
-  const payrollEmployees = employees.map(emp => {
-    const records = attMap[emp.user_id] || [];
-    const presentDays = records.length;
-    const absentDays = Math.max(0, totalWorkingDays - presentDays);
-    const lateDeduction = records.reduce((sum, r) => sum + (r.deduction_amount || 0), 0);
+    return totalMinutes + sessionMinutes;
 
-    const baseSalary = emp.salary || 0;
-    const incentive = incentiveMap[emp.user_id] || 0;
-    const fine = fineMap[emp.user_id] || 0;
-    const advance = advanceMap[emp.user_id] || 0;
+  },
+  0
+);
 
-    // ✅ Per day salary
-    const perDaySalary = totalWorkingDays > 0
-      ? baseSalary / totalWorkingDays
-      : 0;
-
-    // ✅ Earned salary based on days present
-    const earnedSalary = Math.round(perDaySalary * presentDays);
-
-    // ✅ Absent deduction
-    const absentDeduction = Math.round(perDaySalary * absentDays);
-
-    // ✅ Net = earned + incentive - fine - lateDeduction - advance
-    const netSalary = earnedSalary + incentive - fine - lateDeduction - advance;
-
-    return {
-      employee_id: emp.user_id,
-      employee_name: `${emp.f_name} ${emp.l_name}`,
-      branch_id: emp.branch_id,
-      branch_name: emp.branch_name,
-      base_salary: baseSalary,
-      per_day_salary: Math.round(perDaySalary),
-      earned_salary: earnedSalary,
-      absent_deduction: absentDeduction,
-      incentive,
-      fine,
-      late_deduction: lateDeduction,
-      advance,
-      net_salary: Math.max(0, netSalary),
-      working_days: totalWorkingDays,
-      present_days: presentDays,
-      absent_days: absentDays
-    };
-  });
-
-  // ✅ Save or update payroll
-  let payroll = existing || new Payroll({
-    payroll_id: new mongoose.Types.ObjectId().toString(),
-    month,
-    branch_id: branch_id || '',
-    generated_by: admin_id,
-    generated_at: new Date()
-  });
-
-  payroll.employees = payrollEmployees;
-  payroll.status = 'GENERATED';
-  payroll.generated_by = admin_id;
-  payroll.generated_at = new Date();
-  payroll.updated_at = new Date();
-
-  await payroll.save();
-
-  // ✅ Mark fines as processed
-  const fineIds = fines.map(f => f._id);
-  await Fine.updateMany(
-    { _id: { $in: fineIds } },
-    { salary_processed: true }
+  const totalLateMinutes = attendances.reduce(
+    (sum, item) => sum + (item.late_minutes || 0),
+    0
   );
 
-  return payroll;
-};
+  const adjustment =
+    await PayrollAdjustment.findOne({
+      employee_id,
+      month
+    });
 
-// ✅ Helper — count working days (Mon-Sat, skip Sunday)
-const calculateWorkingDays = (start, end) => {
-  let count = 0;
-  let current = moment(start);
-  const endDate = moment(end);
+  const paidLeaveDays =
+    adjustment?.paid_leave_days || 0;
 
-  while (current.isSameOrBefore(endDate)) {
-    if (current.day() !== 0) count++; // 0 = Sunday
-    current.add(1, 'day');
-  }
-  return count;
-};
+  const festivalDays =
+    adjustment?.festival_days || 0;
 
-// ============================================
-// 🔥 GET PAYROLL STATUS
-// ============================================
-const getPayroll = async (month, branch_id) => {
-  const payroll = await Payroll.findOne({
+  const paidLeaveMinutes =
+    paidLeaveDays * 600;
+
+  const festivalMinutes =
+    festivalDays * 600;
+
+  const payableMinutes =
+    workedMinutes +
+    paidLeaveMinutes +
+    festivalMinutes;
+
+  const monthlyMinutes = 18000;
+
+  const perMinuteRate =
+    employee.salary / monthlyMinutes;
+
+  const earnedSalary =
+    payableMinutes *
+    perMinuteRate;
+
+  const lateDeduction =
+    totalLateMinutes *
+    perMinuteRate;
+
+  const incentive =
+    (
+      await Incentive.find({
+        employee_id,
+        month
+      })
+    ).reduce(
+      (sum, item) => sum + (item.amount || 0),
+      0
+    );
+
+  const advance =
+    (
+      await Advance.find({
+        employee_id,
+        month
+      })
+    ).reduce(
+      (sum, item) => sum + (item.amount || 0),
+      0
+    );
+
+  const fines = await Fine.find({
+    employee_id,
     month,
-    branch_id: branch_id || ''
+    salary_processed: false,
+    apply_to: 'CURRENT'
   });
+
+  const fine =
+    fines.reduce(
+      (sum, item) => sum + (item.amount || 0),
+      0
+    );
+
+  const netSalary =
+    earnedSalary +
+    incentive -
+    fine -
+    advance -
+    lateDeduction;
+
+  const formula =
+    `((${workedMinutes}+${paidLeaveMinutes}+${festivalMinutes})×${perMinuteRate.toFixed(4)})+${incentive}-${fine}-${advance}-${lateDeduction}`;
+
+  return {
+
+    employee_id,
+
+    employee_name:
+      `${employee.f_name} ${employee.l_name}`,
+
+    branch_id: employee.branch_id,
+    branch_name: employee.branch_name,
+
+    base_salary: employee.salary,
+
+    monthly_minutes: monthlyMinutes,
+
+    worked_minutes: workedMinutes,
+
+    paid_leave_minutes: paidLeaveMinutes,
+
+    festival_minutes: festivalMinutes,
+
+    payable_minutes: payableMinutes,
+
+    total_late_minutes: totalLateMinutes,
+
+    per_minute_rate: perMinuteRate,
+
+    earned_salary: Math.round(
+      earnedSalary
+    ),
+
+    incentive,
+
+    fine,
+
+    advance,
+
+    late_deduction: Math.round(
+      lateDeduction
+    ),
+
+    net_salary: Math.round(
+      netSalary
+    ),
+
+    salary_formula: formula,
+
+    fine_ids: fines.map(
+      item => item._id
+    )
+  };
+};
+
+
+const generateEmployeePayroll = async (
+  employee_id,
+  month,
+  admin_id
+) => {
+
+  const preview =
+    await getEmployeePayrollPreview(
+      employee_id,
+      month
+    );
+
+  let payroll =
+    await EmployeePayroll.findOne({
+      employee_id,
+      month
+    });
+
+  // =====================================
+  // Prevent overwrite if locked/paid
+  // =====================================
+
+  if (
+    payroll &&
+    (
+      payroll.status === 'LOCKED' ||
+      payroll.status === 'PAID'
+    )
+  ) {
+    throw new Error(
+      `Payroll already ${payroll.status}`
+    );
+  }
+
+  // =====================================
+  // Create New Payroll
+  // =====================================
+
+  if (!payroll) {
+
+    payroll =
+      new EmployeePayroll({
+
+        payroll_id:
+          new mongoose.Types.ObjectId().toString(),
+
+        employee_id:
+          preview.employee_id,
+
+        employee_name:
+          preview.employee_name,
+
+        branch_id:
+          preview.branch_id,
+
+        month,
+
+        base_salary:
+          preview.base_salary,
+
+        monthly_minutes:
+          preview.monthly_minutes,
+
+        worked_minutes:
+          preview.worked_minutes,
+
+        paid_leave_minutes:
+          preview.paid_leave_minutes,
+
+        festival_minutes:
+          preview.festival_minutes,
+
+        payable_minutes:
+          preview.payable_minutes,
+
+        total_late_minutes:
+          preview.total_late_minutes,
+
+        per_minute_rate:
+          preview.per_minute_rate,
+
+        earned_salary:
+          preview.earned_salary,
+
+        incentive:
+          preview.incentive,
+
+        fine:
+          preview.fine,
+
+        advance:
+          preview.advance,
+
+        late_deduction:
+          preview.late_deduction,
+
+        net_salary:
+          preview.net_salary,
+
+        salary_formula:
+          preview.salary_formula,
+
+        status: 'GENERATED',
+
+        generated_by:
+          admin_id,
+
+        generated_at:
+          new Date(),
+
+        created_at:
+          new Date(),
+
+        updated_at:
+          new Date()
+      });
+
+  }
+
+  // =====================================
+  // Regenerate Existing Draft
+  // =====================================
+
+  else {
+
+    payroll.employee_name =
+      preview.employee_name;
+
+    payroll.branch_id =
+      preview.branch_id;
+
+    payroll.base_salary =
+      preview.base_salary;
+
+    payroll.monthly_minutes =
+      preview.monthly_minutes;
+
+    payroll.worked_minutes =
+      preview.worked_minutes;
+
+    payroll.paid_leave_minutes =
+      preview.paid_leave_minutes;
+
+    payroll.festival_minutes =
+      preview.festival_minutes;
+
+    payroll.payable_minutes =
+      preview.payable_minutes;
+
+    payroll.total_late_minutes =
+      preview.total_late_minutes;
+
+    payroll.per_minute_rate =
+      preview.per_minute_rate;
+
+    payroll.earned_salary =
+      preview.earned_salary;
+
+    payroll.incentive =
+      preview.incentive;
+
+    payroll.fine =
+      preview.fine;
+
+    payroll.advance =
+      preview.advance;
+
+    payroll.late_deduction =
+      preview.late_deduction;
+
+    payroll.net_salary =
+      preview.net_salary;
+
+    payroll.salary_formula =
+      preview.salary_formula;
+
+    payroll.generated_by =
+      admin_id;
+
+    payroll.generated_at =
+      new Date();
+
+    payroll.updated_at =
+      new Date();
+  }
+
+  await payroll.save();
+
+  // =====================================
+  // Mark fines as processed
+  // =====================================
+
+  if (
+    preview.fine_ids &&
+    preview.fine_ids.length
+  ) {
+
+    await Fine.updateMany(
+      {
+        _id: {
+          $in: preview.fine_ids
+        }
+      },
+      {
+        $set: {
+          salary_processed: true
+        }
+      }
+    );
+  }
+
   return payroll;
 };
 
-// ============================================
-// 🔥 LOCK PAYROLL
-// ============================================
-const lockPayroll = async (month, branch_id, admin_id) => {
-  const payroll = await Payroll.findOne({ month, branch_id: branch_id || '' });
-  if (!payroll) throw new Error('Payroll not found');
-  if (payroll.status !== 'GENERATED') throw new Error('Payroll must be GENERATED to lock');
+const getPayrollEmployees = async (
+  month,
+  branch_id = ''
+) => {
+
+  const employeeFilter = {
+    role: 'employee'
+  };
+
+  if (branch_id) {
+    employeeFilter.branch_id = branch_id;
+  }
+
+  const employees =
+    await User.find(
+      employeeFilter
+    )
+      .select(
+        'user_id f_name l_name branch_id branch_name salary designation'
+      )
+      .lean();
+
+  const payrolls =
+    await EmployeePayroll.find({
+      month
+    }).lean();
+
+  const payrollMap =
+    new Map();
+
+  payrolls.forEach((payroll) => {
+
+    payrollMap.set(
+      payroll.employee_id,
+      payroll
+    );
+
+  });
+
+  return employees.map((employee) => {
+
+    const payroll =
+      payrollMap.get(
+        employee.user_id
+      );
+
+    return {
+
+      employee_id:
+        employee.user_id,
+
+      employee_name:
+        `${employee.f_name || ''} ${employee.l_name || ''}`.trim(),
+
+      branch_id:
+        employee.branch_id,
+
+      branch_name:
+        employee.branch_name,
+
+      designation:
+        employee.designation,
+
+      salary:
+        employee.salary || 0,
+
+      payroll_generated:
+        !!payroll,
+
+      payroll_status:
+        payroll
+          ? payroll.status
+          : 'NOT_GENERATED',
+
+      net_salary:
+        payroll
+          ? payroll.net_salary
+          : 0,
+
+      generated_at:
+        payroll?.generated_at || null,
+
+      paid_at:
+        payroll?.paid_at || null,
+
+      locked_at:
+        payroll?.locked_at || null
+
+    };
+
+  });
+
+};
+
+const lockEmployeePayroll = async (
+  employee_id,
+  month,
+  admin_id
+) => {
+
+  const payroll =
+    await EmployeePayroll.findOne({
+      employee_id,
+      month
+    });
+
+  if (!payroll) {
+    throw new Error(
+      'Payroll not generated'
+    );
+  }
+
+  if (payroll.status === 'PAID') {
+    throw new Error(
+      'Payroll already paid'
+    );
+  }
 
   payroll.status = 'LOCKED';
-  payroll.locked_by = admin_id;
-  payroll.locked_at = new Date();
-  payroll.updated_at = new Date();
+
+  payroll.locked_by =
+    admin_id;
+
+  payroll.locked_at =
+    new Date();
+
+  payroll.updated_at =
+    new Date();
+
   await payroll.save();
+
   return payroll;
 };
 
-// ============================================
-// 🔥 UNLOCK PAYROLL
-// ============================================
-const unlockPayroll = async (month, branch_id) => {
-  const payroll = await Payroll.findOne({ month, branch_id: branch_id || '' });
-  if (!payroll) throw new Error('Payroll not found');
-  if (payroll.status !== 'LOCKED') throw new Error('Payroll must be LOCKED to unlock');
+const markEmployeePayrollPaid = async (
+  employee_id,
+  month,
+  admin_id
+) => {
 
-  payroll.status = 'GENERATED';
-  payroll.updated_at = new Date();
-  await payroll.save();
-  return payroll;
-};
+  const payroll =
+    await EmployeePayroll.findOne({
+      employee_id,
+      month
+    });
 
-// ============================================
-// 🔥 MARK AS PAID
-// ============================================
-const markAsPaid = async (month, branch_id, admin_id) => {
-  const payroll = await Payroll.findOne({ month, branch_id: branch_id || '' });
-  if (!payroll) throw new Error('Payroll not found');
-  if (payroll.status !== 'LOCKED') throw new Error('Payroll must be LOCKED to mark as paid');
+  if (!payroll) {
+
+    throw new Error(
+      'Payroll not generated'
+    );
+
+  }
+
+  if (
+    payroll.status === 'PAID'
+  ) {
+
+    throw new Error(
+      'Salary already paid'
+    );
+
+  }
+
+  const snapshot =
+    await getEmployeePayrollSlip(
+      employee_id,
+      month
+    );
 
   payroll.status = 'PAID';
-  payroll.paid_by = admin_id;
-  payroll.paid_at = new Date();
-  payroll.updated_at = new Date();
 
-  await globalActivity({
-  operator_id:        'admin',
-  action_type:        'SALARY_PAID',
-  target_employee_id: null, // affects all
-  branch_id:          branch_id,
-  metadata: { month, total_employees: payroll.employees.length }
-});
+  payroll.payroll_snapshot =
+    snapshot;
+
+  payroll.paid_by =
+    admin_id;
+
+  payroll.paid_at =
+    new Date();
+
+  payroll.updated_at =
+    new Date();
+
   await payroll.save();
+
   return payroll;
+
 };
+
+
+const getEmployeePayroll = async (
+  employee_id,
+  month
+) => {
+
+  return await EmployeePayroll.findOne({
+    employee_id,
+    month
+  });
+
+};
+// END
 
 const updateEmployeeSalaries = async (updates, admin_id) => {
 
@@ -679,24 +1320,24 @@ const getAdminActivity = async (branch_id, limit = 50) => {
   users.forEach(u => { userMap[u.user_id] = `${u.f_name} ${u.l_name}`; });
 
   return logs.map(log => ({
-    log_id:          log.log_id,
-    action_type:     log.action_type,
-    operator:        userMap[log.operator_id] || 'System',
+    log_id: log.log_id,
+    action_type: log.action_type,
+    operator: userMap[log.operator_id] || 'System',
     target_employee: userMap[log.target_employee_id] || null,
-    metadata:        log.metadata,
-    created_at:      log.created_at,
-    message:         formatActivityMessage(
+    metadata: log.metadata,
+    created_at: log.created_at,
+    message: formatActivityMessage(
       log.action_type, log.metadata,
       userMap[log.operator_id],
       userMap[log.target_employee_id],
-      'admin' 
+      'admin'
     ),
   }));
 };
 
 // ✅ Format human readable messages
 const formatActivityMessage = (actionType, metadata, operatorName, employeeName, viewMode = 'employee') => {
-  const op  = operatorName || 'Someone';
+  const op = operatorName || 'Someone';
   const emp = employeeName || 'you';
 
   // ✅ For employee view — "you" context
@@ -770,6 +1411,182 @@ const formatActivityMessage = (actionType, metadata, operatorName, employeeName,
   }
 };
 
+const getEmployeePayrollSlip = async (
+  employee_id,
+  month
+) => {
+
+  const payroll =
+    await EmployeePayroll.findOne({
+      employee_id,
+      month
+    }).lean();
+
+  if (!payroll) {
+    throw new Error(
+      'Salary not generated yet'
+    );
+  }
+
+  // Once paid, return frozen snapshot
+  if (
+    payroll.status === 'PAID' &&
+    payroll.payroll_snapshot
+  ) {
+
+    return payroll.payroll_snapshot;
+
+  }
+
+  const employee =
+    await User.findOne({
+      user_id: employee_id
+    }).lean();
+
+  const startDate =
+    moment(month + '-01')
+      .startOf('month')
+      .format('YYYY-MM-DD');
+
+  const endDate =
+    moment(month + '-01')
+      .endOf('month')
+      .format('YYYY-MM-DD');
+
+  const attendances =
+    await Attendance.find({
+
+      employee_id,
+
+      attendance_date: {
+        $gte: startDate,
+        $lte: endDate
+      }
+
+    })
+      .sort({
+        attendance_date: 1
+      })
+      .lean();
+
+  const attendanceRows =
+    attendances.map(att => ({
+
+      date:
+        att.attendance_date,
+
+      status:
+        att.status,
+
+      sessions:
+        att.sessions || [],
+
+      worked_minutes:
+          (att.sessions || []).reduce(
+    (sum, session) =>
+      sum + Number(session.duration || 0),
+    0
+  ),
+
+      late_minutes:
+        att.late_minutes || 0
+
+    }));
+
+  const incentives =
+    await Incentive.find({
+      employee_id,
+      month
+    }).lean();
+
+  const advances =
+    await Advance.find({
+      employee_id,
+      month
+    }).lean();
+
+  const fines =
+    await Fine.find({
+
+      employee_id,
+
+      month,
+
+      salary_processed: true
+
+    }).lean();
+
+  const presentDays =
+    attendanceRows.filter(
+      x => x.status !== 'ABSENT'
+    ).length;
+
+  const absentDays =
+    attendanceRows.filter(
+      x => x.status === 'ABSENT'
+    ).length;
+
+  return {
+
+    employee: {
+
+      employee_id:
+        employee.user_id,
+
+      employee_name:
+        `${employee.f_name} ${employee.l_name}`,
+
+      branch_name:
+        employee.branch_name,
+
+      designation:
+        employee.designation,
+
+      phone:
+        employee.phone
+
+    },
+
+    payroll,
+
+    attendance_summary: {
+
+      present_days:
+        presentDays,
+
+      absent_days:
+        absentDays,
+
+      worked_minutes:
+        payroll.worked_minutes,
+
+      late_minutes:
+        payroll.total_late_minutes,
+
+      paid_leave_minutes:
+        payroll.paid_leave_minutes,
+
+      festival_minutes:
+        payroll.festival_minutes,
+
+      payable_minutes:
+        payroll.payable_minutes
+
+    },
+
+    attendance_rows:
+      attendanceRows,
+
+    incentives,
+
+    advances,
+
+    fines
+
+  };
+
+};
+
 module.exports = {
   getAdminDashboard,
   createEmployee,
@@ -780,11 +1597,16 @@ module.exports = {
   saveAdvance,
   getAdvanceList,
   removeAdvance,
-  generatePayroll,
-  getPayroll,
-  lockPayroll,
-  unlockPayroll,
-  markAsPaid,
   updateEmployeeSalaries,
-  getAdminActivity
+  getAdminActivity,
+
+  savePayrollAdjustment,
+  getEmployeePayrollPreview,
+  generateEmployeePayroll,
+  getPayrollEmployees,
+  lockEmployeePayroll,
+  markEmployeePayrollPaid,
+  getEmployeePayroll,
+  getEmployeePayrollSlip
+
 };

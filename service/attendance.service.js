@@ -4,6 +4,7 @@ const moment = require('moment');
 const Attendance = mongoose.model('attendance');
 const Deduction = mongoose.model('deduction');
 const Payroll = mongoose.model('payroll');
+const User = mongoose.model('user');
 
 const calculateDeduction = (lateMinutes, rules = []) => {
   let deduction = 0;
@@ -20,93 +21,170 @@ const calculateDeduction = (lateMinutes, rules = []) => {
 // ============================================
 
 const punch = async (employee_id, branch_id, photoUrl = null) => {
+
   const now = new Date();
   const attendance_date = moment(now).format('YYYY-MM-DD');
 
+  // Get employee shift details
+  const employee = await User.findOne(
+    { user_id: employee_id },
+    { shift_time: 1 }
+  );
 
+  let record = await Attendance.findOne({
+    employee_id,
+    attendance_date
+  });
 
-  let record = await Attendance.findOne({ employee_id, attendance_date });
-
-  // 👉 FIRST PUNCH IN
+  // ==========================================
+  // FIRST PUNCH IN
+  // ==========================================
   if (!record) {
-    const shiftStart = moment(now).startOf('day').add(9, 'hours');
-    const actualIn = moment(now);
 
     let lateMinutes = 0;
-    if (actualIn.isAfter(shiftStart)) {
-      lateMinutes = actualIn.diff(shiftStart, 'minutes');
-    }
+    let deductionAmount = 0;
 
-    const deductionConfig = await Deduction.findOne({});
-    const deductionAmount = calculateDeduction(
-      lateMinutes,
-      deductionConfig && deductionConfig.rules ? deductionConfig.rules : []
-    );
+    // Only calculate late if shift time exists
+    if (
+      employee &&
+      employee.shift_time &&
+      employee.shift_time.trim() !== ''
+    ) {
+
+      const [hours, minutes] = employee.shift_time
+        .split(':')
+        .map(Number);
+
+      const shiftStart = moment(now)
+        .startOf('day')
+        .add(hours, 'hours')
+        .add(minutes, 'minutes');
+
+      const actualIn = moment(now);
+
+      if (actualIn.isAfter(shiftStart)) {
+        lateMinutes = actualIn.diff(
+          shiftStart,
+          'minutes'
+        );
+      }
+
+      const deductionConfig = await Deduction.findOne({});
+
+      deductionAmount = calculateDeduction(
+        lateMinutes,
+        deductionConfig?.rules || []
+      );
+    }
 
     record = new Attendance({
       attendance_id: new mongoose.Types.ObjectId().toString(),
+
       employee_id,
       branch_id,
       attendance_date,
+      shift_time: employee?.shift_time || null,
+
       sessions: [{
         punch_in: now,
         punch_out: null,
         duration: 0,
-        punch_in_photo: photoUrl  // ✅ NEW
+        punch_in_photo: photoUrl
       }],
+
       total_hours: 0,
-      status: 'PRESENT',
+
+      status:
+        lateMinutes > 0
+          ? 'LATE'
+          : 'PRESENT',
+
       late_minutes: lateMinutes,
       deduction_amount: deductionAmount,
-      is_active: true,
+
+      is_active: true
     });
 
     await record.save();
-    return { type: 'PUNCH_IN', message: 'Punch In successful' };
+
+    return {
+      type: 'PUNCH_IN',
+      message: 'Punch In successful'
+    };
   }
 
-  // 👉 PUNCH OUT — unchanged
+  // ==========================================
+  // PUNCH OUT
+  // ==========================================
   if (record.is_active) {
+
     const activeSession = record.sessions
       .slice()
       .reverse()
-      .find(s => s.punch_in && !s.punch_out);
+      .find(
+        s =>
+          s.punch_in &&
+          !s.punch_out
+      );
 
     if (activeSession) {
+
       const duration = Math.floor(
-        (now - new Date(activeSession.punch_in)) / (1000 * 60)
+        (
+          now -
+          new Date(activeSession.punch_in)
+        ) /
+        (1000 * 60)
       );
+
       activeSession.punch_out = now;
       activeSession.duration = duration;
       activeSession.punch_out_photo = photoUrl;
     }
 
-    const totalMinutes = record.sessions.reduce(
-      (sum, s) => sum + (s.duration || 0), 0
-    );
+    const totalMinutes =
+      record.sessions.reduce(
+        (sum, session) =>
+          sum + (session.duration || 0),
+        0
+      );
 
     record.total_hours = totalMinutes;
     record.is_active = false;
     record.updated_at = new Date();
+
     record.markModified('sessions');
+
     await record.save();
 
-    return { type: 'PUNCH_OUT', message: 'Punch Out successful', total_hours: totalMinutes };
+    return {
+      type: 'PUNCH_OUT',
+      message: 'Punch Out successful',
+      total_hours: totalMinutes
+    };
   }
 
-  // 👉 SUBSEQUENT PUNCH IN
+  // ==========================================
+  // SUBSEQUENT PUNCH IN
+  // ==========================================
   record.sessions.push({
     punch_in: now,
     punch_out: null,
     duration: 0,
     punch_in_photo: photoUrl
   });
+
   record.is_active = true;
   record.updated_at = new Date();
+
   record.markModified('sessions');
+
   await record.save();
 
-  return { type: 'PUNCH_IN', message: 'Punch In successful' };
+  return {
+    type: 'PUNCH_IN',
+    message: 'Punch In successful'
+  };
 };
 
 // ============================================
@@ -194,10 +272,12 @@ const getAttendanceList = async (employee_id, month, year) => {
 
   return records.map((r) => ({
     date: r.attendance_date,
-        total_hours: r.total_hours,    // ✅ total for the day
+    total_hours: r.total_hours,
     status: r.status,
     late_minutes: r.late_minutes,
-    deduction: r.deduction_amount
+    deduction: r.deduction_amount,
+    is_active: r.is_active,
+    sessions: r.sessions || []
   }));
 };
 

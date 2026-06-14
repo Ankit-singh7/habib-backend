@@ -72,9 +72,9 @@ exports.operatorPunch = async (req, res) => {
 exports.changeShift = async (req, res) => {
   try {
 
-    const { employee_id, new_shift, operator_id } = req.body;
+    const { employee_id, new_shift, operator_id, shift_time } = req.body;
 
-    if (!employee_id || !new_shift || !operator_id) {
+    if (!employee_id || !new_shift || !operator_id ||  !shift_time) {
       return res.status(400).send({
         error: true,
         message: 'Missing required fields'
@@ -84,6 +84,7 @@ exports.changeShift = async (req, res) => {
     const data = await operatorService.changeShift(
       employee_id,
       new_shift,
+      shift_time,
       operator_id
     );
 
@@ -162,6 +163,56 @@ exports.addFine = async (req, res) => {
     res.status(500).send({
       error: true,
       message: err.message
+    });
+  }
+};
+
+exports.addAdvance = async (req, res) => {
+  try {
+
+    const {
+      employee_id,
+      branch_id,
+      amount,
+      reason,
+      month,
+      added_by
+    } = req.body;
+
+    if (
+      !employee_id ||
+      !amount ||
+      !month ||
+      !added_by
+    ) {
+      return res.status(400).send({
+        error: true,
+        message: 'Missing required fields'
+      });
+    }
+
+    const data = await operatorService.addAdvance({
+      employee_id,
+      branch_id,
+      amount: Number(amount),
+      reason,
+      month,
+      added_by
+    });
+
+    res.status(200).send({
+      error: false,
+      message: 'Advance added successfully',
+      data
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).send({
+      error: true,
+      message: err.message || 'Failed to add advance'
     });
   }
 };

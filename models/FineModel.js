@@ -52,6 +52,12 @@ let fineSchema = new Schema({
     default: false
   },
 
+  month: {
+    type: String, // YYYY-MM
+    required: true,
+    index: true
+  },
+
   created_at: {
     type: Date,
     default: Date.now,

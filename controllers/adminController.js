@@ -50,37 +50,52 @@ const createEmployee = async (req, res) => {
 
 const adminOverwriteAttendance = async (req, res) => {
   try {
-    // ✅ Destructure from req.body — not passing whole object
+
     const {
       employee_id,
       branch_id,
       date,
-      in_time,
-      out_time,
+      sessions,
       admin_id
     } = req.body;
 
+    if (!employee_id) {
+      return res.status(400).send({
+        error: true,
+        message: 'employee_id is required'
+      });
+    }
+
+    if (!date) {
+      return res.status(400).send({
+        error: true,
+        message: 'date is required'
+      });
+    }
+
     const result = await adminService.adminOverwriteAttendance(
-      employee_id,  // ✅ individual params — not req.body
+      employee_id,
       branch_id,
       admin_id,
       date,
-      in_time,
-      out_time
+      sessions || []
     );
 
-    res.status(200).send({
+    return res.status(200).send({
       error: false,
       message: result.message,
       data: result
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).send({
+
+    console.error('adminOverwriteAttendance:', err);
+
+    return res.status(500).send({
       error: true,
       message: err.message || 'Failed to process attendance'
     });
+
   }
 };
 
@@ -146,57 +161,6 @@ const removeAdvance = async (req, res) => {
   }
 };
 
-const generatePayroll = async (req, res) => {
-  try {
-    const { month, branch_id } = req.body;
-    const admin_id = req.body.admin_id;
-    const result = await adminService.generatePayroll(month, branch_id, admin_id);
-    res.status(200).send({ error: false, message: 'Payroll generated', data: result });
-  } catch (err) {
-    res.status(500).send({ error: true, message: err.message });
-  }
-};
-
-const getPayroll = async (req, res) => {
-  try {
-    const { month, branch_id } = req.query;
-    const result = await adminService.getPayroll(month, branch_id);
-    res.status(200).send({ error: false, message: 'Payroll fetched', data: result });
-  } catch (err) {
-    res.status(500).send({ error: true, message: err.message });
-  }
-};
-
-const lockPayroll = async (req, res) => {
-  try {
-    const { month, branch_id, admin_id } = req.body;
-    const result = await adminService.lockPayroll(month, branch_id, admin_id);
-    res.status(200).send({ error: false, message: 'Payroll locked', data: result });
-  } catch (err) {
-    res.status(500).send({ error: true, message: err.message });
-  }
-};
-
-const unlockPayroll = async (req, res) => {
-  try {
-    const { month, branch_id } = req.body;
-    const result = await adminService.unlockPayroll(month, branch_id);
-    res.status(200).send({ error: false, message: 'Payroll unlocked', data: result });
-  } catch (err) {
-    res.status(500).send({ error: true, message: err.message });
-  }
-};
-
-const markAsPaid = async (req, res) => {
-  try {
-    const { month, branch_id, admin_id } = req.body;
-    const result = await adminService.markAsPaid(month, branch_id, admin_id);
-    res.status(200).send({ error: false, message: 'Payroll marked as paid', data: result });
-  } catch (err) {
-    res.status(500).send({ error: true, message: err.message });
-  }
-};
-
 const updateEmployeeSalaries = async (req, res) => {
   try {
 
@@ -233,7 +197,7 @@ const getEmployeeList = async (req, res) => {
     const employees = await User.find(
       { role: { $regex: '^employee$', $options: 'i' }, status: 'Active' },
       { user_id: 1, f_name: 1, l_name: 1, designation: 1, branch_name: 1,
-        branch_id: 1, shift: 1, salary: 1, phone: 1, email: 1, role: 1, status: 1, documents: 1 }
+        branch_id: 1, shift: 1, salary: 1, phone: 1, email: 1, role: 1, status: 1, documents: 1, shift_time: 1 }
     );
     res.status(200).send({ error: false, message: 'Employee list', data: employees });
   } catch (err) {
@@ -259,7 +223,8 @@ const updateEmployee = async (req, res) => {
       branch_name: data.branch_name,
       shift:       data.shift,
       salary:      Number(data.salary),
-      updated_at:  new Date()
+      updated_at:  new Date(),
+      shift_time:  data.shift_time,
     };
 
     // ✅ Update docs if new files uploaded
@@ -302,6 +267,294 @@ const getAdminActivity = async (req, res) => {
   }
 };
 
+const savePayrollAdjustment = async (req, res) => {
+
+  try {
+
+    const {
+      employee_id,
+      branch_id,
+      month,
+      paid_leave_days,
+      festival_days,
+      updated_by
+    } = req.body;
+
+    const data =
+      await adminService.savePayrollAdjustment(
+        employee_id,
+        branch_id,
+        month,
+        Number(paid_leave_days || 0),
+        Number(festival_days || 0),
+        updated_by
+      );
+
+    res.status(200).send({
+      error: false,
+      message: 'Payroll adjustment saved successfully',
+      data
+    });
+
+  } catch (err) {
+
+    res.status(500).send({
+      error: true,
+      message: err.message
+    });
+
+  }
+
+};
+
+const getEmployeePayrollPreview = async (req, res) => {
+
+  try {
+
+    const {
+      employee_id,
+      month
+    } = req.query;
+
+    const data =
+      await adminService.getEmployeePayrollPreview(
+        employee_id,
+        month
+      );
+
+    res.status(200).send({
+      error: false,
+      message: 'Payroll preview fetched successfully',
+      data
+    });
+
+  } catch (err) {
+
+    res.status(500).send({
+      error: true,
+      message: err.message
+    });
+
+  }
+
+};
+
+const generateEmployeePayroll = async (req, res) => {
+
+  try {
+
+    const {
+      employee_id,
+      month,
+      admin_id
+    } = req.body;
+
+    const data =
+      await adminService.generateEmployeePayroll(
+        employee_id,
+        month,
+        admin_id
+      );
+
+    res.status(200).send({
+      error: false,
+      message: 'Payroll generated successfully',
+      data
+    });
+
+  } catch (err) {
+
+    res.status(500).send({
+      error: true,
+      message: err.message
+    });
+
+  }
+
+};
+
+const getPayrollEmployees = async (req, res) => {
+
+  try {
+
+    const {
+      month,
+      branch_id
+    } = req.query;
+
+    const data =
+      await adminService.getPayrollEmployees(
+        month,
+        branch_id || ''
+      );
+
+    res.status(200).send({
+      error: false,
+      message: 'Payroll employees fetched successfully',
+      data
+    });
+
+  } catch (err) {
+
+    res.status(500).send({
+      error: true,
+      message: err.message
+    });
+
+  }
+
+};
+
+const lockEmployeePayroll = async (req, res) => {
+
+  try {
+
+    const {
+      employee_id,
+      month,
+      admin_id
+    } = req.body;
+
+    const data =
+      await adminService.lockEmployeePayroll(
+        employee_id,
+        month,
+        admin_id
+      );
+
+    res.status(200).send({
+      error: false,
+      message: 'Payroll locked successfully',
+      data
+    });
+
+  } catch (err) {
+
+    res.status(500).send({
+      error: true,
+      message: err.message
+    });
+
+  }
+
+};
+
+const markEmployeePayrollPaid = async (req, res) => {
+
+  try {
+
+    const {
+      employee_id,
+      month,
+      admin_id
+    } = req.body;
+
+    const data =
+      await adminService.markEmployeePayrollPaid(
+        employee_id,
+        month,
+        admin_id
+      );
+
+    res.status(200).send({
+      error: false,
+      message: 'Payroll marked as paid successfully',
+      data
+    });
+
+  } catch (err) {
+
+    res.status(500).send({
+      error: true,
+      message: err.message
+    });
+
+  }
+
+};
+
+const getEmployeePayroll = async (
+  req,
+  res
+) => {
+
+  try {
+
+    const payroll =
+      await adminService
+        .getEmployeePayroll(
+          req.query.employee_id,
+          req.query.month
+        );
+
+    return res.send({
+
+      error: false,
+      message: 'Payroll fetched',
+      data: payroll
+
+    });
+
+  }
+
+  catch (err) {
+
+    return res.status(500).send({
+
+      error: true,
+      message: err.message
+
+    });
+
+  }
+
+};
+
+const getEmployeePayrollSlip =
+  async (req, res) => {
+
+    try {
+
+      const {
+        employee_id,
+        month
+      } = req.query;
+
+      const data =
+        await adminService
+          .getEmployeePayrollSlip(
+
+            employee_id,
+            month
+
+          );
+
+      return res.send({
+
+        error: false,
+
+        message:
+          'Salary slip fetched',
+
+        data
+
+      });
+
+    }
+    catch (err) {
+
+      return res.status(400).send({
+
+        error: true,
+
+        message: err.message
+
+      });
+
+    }
+
+  };
+
 module.exports = {
     getDashboard,
     createEmployee,
@@ -312,14 +565,17 @@ module.exports = {
     saveAdvance,
     getAdvanceList,
     removeAdvance,
-
-    generatePayroll,
-    getPayroll,
-    lockPayroll,
-    unlockPayroll,
-    markAsPaid,
     updateEmployeeSalaries,
     getEmployeeList,
     updateEmployee,
-    getAdminActivity
+    getAdminActivity,
+
+    savePayrollAdjustment,
+    getEmployeePayrollPreview,
+    generateEmployeePayroll,
+    getPayrollEmployees,
+    lockEmployeePayroll,
+    markEmployeePayrollPaid,
+    getEmployeePayroll,
+    getEmployeePayrollSlip
 };

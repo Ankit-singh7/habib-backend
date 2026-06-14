@@ -11,6 +11,7 @@ const BranchHistory = mongoose.model('branch_history');
 const Fine = mongoose.model('employee_fine');
 const OperatorActivity = mongoose.model('operator_activity');
 const Deduction = mongoose.model('deduction');
+const Advance = mongoose.model('advance');
 
 
 const calculateDeduction = (lateMinutes, rules = []) => {
@@ -88,7 +89,8 @@ const getEmployeeListWithStatus = async () => {
       branch_name: 1,
       branch_id: 1,
       shift: 1,
-      salary: 1
+      salary: 1,
+      shift_time: 1
     }
   );
 
@@ -133,6 +135,7 @@ const getEmployeeListWithStatus = async () => {
       branch_id: emp.branch_id,
       shift: emp.shift,
       salary: emp.salary,
+      shift_time: emp.shift_time,
 
       // ✅ Attendance data
       status,
@@ -161,42 +164,101 @@ const getEmployeeListWithStatus = async () => {
 };
 
 const operatorPunch = async (employee_id, operator_id) => {
+
   const now = new Date();
   const attendance_date = moment(now).format('YYYY-MM-DD');
 
-  // ✅ Find today's record (not by is_active — by date)
-  let record = await Attendance.findOne({ employee_id, attendance_date });
+  // Employee details
+  const employee = await User.findOne(
+    { user_id: employee_id },
+    {
+      shift_time: 1,
+      branch_id: 1
+    }
+  );
+
+  // Today's attendance
+  let record = await Attendance.findOne({
+    employee_id,
+    attendance_date
+  });
 
   // ============================================
-  // 👉 FIRST PUNCH IN OF THE DAY
+  // FIRST PUNCH IN OF THE DAY
   // ============================================
   if (!record) {
-    const shiftStart = moment(now).startOf('day').add(9, 'hours');
-    const actualIn = moment(now);
 
     let lateMinutes = 0;
-    if (actualIn.isAfter(shiftStart)) {
-      lateMinutes = actualIn.diff(shiftStart, 'minutes');
-    }
+    let deductionAmount = 0;
 
-    const deductionConfig = await Deduction.findOne({});
-    const deductionAmount = calculateDeduction(
-      lateMinutes,
-      deductionConfig && deductionConfig.rules ? deductionConfig.rules : []
-    );
+    // Calculate late only if shift time exists
+    if (
+      employee &&
+      employee.shift_time &&
+      employee.shift_time.trim() !== ''
+    ) {
+
+      const [hours, minutes] = employee.shift_time
+        .split(':')
+        .map(Number);
+
+      const shiftStart = moment(now)
+        .startOf('day')
+        .add(hours, 'hours')
+        .add(minutes, 'minutes');
+
+      const actualIn = moment(now);
+
+      if (actualIn.isAfter(shiftStart)) {
+        lateMinutes = actualIn.diff(
+          shiftStart,
+          'minutes'
+        );
+      }
+
+      const deductionConfig = await Deduction.findOne({});
+
+      deductionAmount = calculateDeduction(
+        lateMinutes,
+        deductionConfig?.rules || []
+      );
+    }
 
     record = new Attendance({
       attendance_id: new mongoose.Types.ObjectId().toString(),
+
       employee_id,
+
+      branch_id:
+        employee?.branch_id || null,
+
       attendance_date,
-      sessions: [{ punch_in: now, punch_out: null, duration: 0 }],
+
+      shift_time:
+        employee?.shift_time || null,
+
+      sessions: [{
+        punch_in: now,
+        punch_out: null,
+        duration: 0
+      }],
+
       total_hours: 0,
-      status: 'PRESENT',
+
+      status:
+        lateMinutes > 0
+          ? 'LATE'
+          : 'PRESENT',
+
       late_minutes: lateMinutes,
+
       deduction_amount: deductionAmount,
+
       is_active: true,
+
       punch_by: 'OPERATOR',
-      operator_id,
+
+      operator_id
     });
 
     await record.save();
@@ -205,41 +267,61 @@ const operatorPunch = async (employee_id, operator_id) => {
       operator_id,
       action_type: 'PUNCH',
       target_employee_id: employee_id,
-      metadata: { type: 'PUNCH_IN', time: now }
+      metadata: {
+        type: 'PUNCH_IN',
+        time: now
+      }
     });
 
     await globalActivity({
-      operator_id:        operator_id,
-      action_type:        'PUNCH_IN',
+      operator_id,
+      action_type: 'PUNCH_IN',
       target_employee_id: employee_id,
-      branch_id:          record.branch_id || null,  // ✅ from record
-      metadata:           { type: 'PUNCH_IN', time: now }
+      branch_id: record.branch_id || null,
+      metadata: {
+        type: 'PUNCH_IN',
+        time: now
+      }
     });
 
-
-    return { type: 'PUNCH_IN', message: 'Punch In successful' };
+    return {
+      type: 'PUNCH_IN',
+      message: 'Punch In successful'
+    };
   }
 
   // ============================================
-  // 👉 PUNCH OUT — close active session
+  // PUNCH OUT
   // ============================================
   if (record.is_active) {
+
     const activeSession = record.sessions
       .slice()
       .reverse()
-      .find((s) => s.punch_in && !s.punch_out);
+      .find(
+        s =>
+          s.punch_in &&
+          !s.punch_out
+      );
 
     if (activeSession) {
+
       const duration = Math.floor(
-        (now.getTime() - new Date(activeSession.punch_in).getTime()) / (1000 * 60)
+        (
+          now.getTime() -
+          new Date(activeSession.punch_in).getTime()
+        ) /
+        (1000 * 60)
       );
+
       activeSession.punch_out = now;
       activeSession.duration = duration;
     }
 
-    // ✅ Recalculate total across all sessions
     const totalMinutes = record.sessions.reduce(
-      (sum, s) => sum + (s.duration || 0), 0
+      (sum, session) =>
+        sum + (session.duration || 0),
+      0
     );
 
     record.total_hours = totalMinutes;
@@ -248,21 +330,30 @@ const operatorPunch = async (employee_id, operator_id) => {
     record.operator_id = operator_id;
     record.updated_at = now;
 
+    record.markModified('sessions');
+
     await record.save();
 
     await logActivity({
       operator_id,
       action_type: 'PUNCH',
       target_employee_id: employee_id,
-      metadata: { type: 'PUNCH_OUT', time: now }
+      metadata: {
+        type: 'PUNCH_OUT',
+        time: now
+      }
     });
 
     await globalActivity({
-      operator_id:        operator_id,
-      action_type:        'PUNCH_OUT',
+      operator_id,
+      action_type: 'PUNCH_OUT',
       target_employee_id: employee_id,
-      branch_id:          record.branch_id || null,  // ✅ from record
-      metadata:           { type: 'PUNCH_OUT', time: now, total_hours: totalMinutes }
+      branch_id: record.branch_id || null,
+      metadata: {
+        type: 'PUNCH_OUT',
+        time: now,
+        total_hours: totalMinutes
+      }
     });
 
     return {
@@ -273,13 +364,20 @@ const operatorPunch = async (employee_id, operator_id) => {
   }
 
   // ============================================
-  // 👉 SUBSEQUENT PUNCH IN — add new session
+  // SUBSEQUENT PUNCH IN
   // ============================================
-  record.sessions.push({ punch_in: now, punch_out: null, duration: 0 });
+  record.sessions.push({
+    punch_in: now,
+    punch_out: null,
+    duration: 0
+  });
+
   record.is_active = true;
   record.punch_by = 'OPERATOR';
   record.operator_id = operator_id;
   record.updated_at = now;
+
+  record.markModified('sessions');
 
   await record.save();
 
@@ -287,21 +385,30 @@ const operatorPunch = async (employee_id, operator_id) => {
     operator_id,
     action_type: 'PUNCH',
     target_employee_id: employee_id,
-    metadata: { type: 'PUNCH_IN', time: now }
+    metadata: {
+      type: 'PUNCH_IN',
+      time: now
+    }
   });
 
   await globalActivity({
-    operator_id:        operator_id,
-    action_type:        'PUNCH_IN',
+    operator_id,
+    action_type: 'PUNCH_IN',
     target_employee_id: employee_id,
-    branch_id:          record.branch_id || null,  // ✅ from record
-    metadata:           { type: 'PUNCH_IN', time: now }
+    branch_id: record.branch_id || null,
+    metadata: {
+      type: 'PUNCH_IN',
+      time: now
+    }
   });
 
-  return { type: 'PUNCH_IN', message: 'Punch In successful' };
+  return {
+    type: 'PUNCH_IN',
+    message: 'Punch In successful'
+  };
 };
 
-const changeShift = async (employee_id, new_shift, operator_id) => {
+const changeShift = async (employee_id, new_shift,  shift_time, operator_id) => {
 
   // 🔹 Step 1: Get employee
   const employee = await User.findOne({ user_id: employee_id });
@@ -314,6 +421,7 @@ const changeShift = async (employee_id, new_shift, operator_id) => {
 
   // 🔹 Step 2: Update user
   employee.shift = new_shift;
+  employee.shift_time = shift_time;
   await employee.save();
 
   // 🔹 Step 3: Save history (🔥 IMPORTANT)
@@ -426,10 +534,17 @@ const changeBranch = async (employee_id, new_branch_id, operator_id) => {
   };
 };
 
-const addFine = async (employee_id, amount, reason, operator_id) => {
+const addFine = async (
+  employee_id,
+  amount,
+  reason,
+  operator_id
+) => {
 
-  // 🔹 Step 1: Validate employee
-  const employee = await User.findOne({ user_id: employee_id });
+  // 🔹 Validate employee
+  const employee = await User.findOne({
+    user_id: employee_id
+  });
 
   if (!employee) {
     throw new Error('Employee not found');
@@ -439,17 +554,31 @@ const addFine = async (employee_id, amount, reason, operator_id) => {
     throw new Error('Invalid fine amount');
   }
 
-  const today = moment().format('YYYY-MM-DD');
+  const month = moment().format('YYYY-MM');
 
-  // 🔹 Step 2: Save fine
+  // 🔹 Save fine
   await Fine.create({
-    fine_id: new mongoose.Types.ObjectId().toString(),
+
+    fine_id:
+      new mongoose.Types.ObjectId().toString(),
+
     employee_id,
+
+    operator_id,
+
+    branch_id:
+      employee.branch_id || null,
+
     amount,
+
     reason,
-    fine_date: today,
-    added_by: 'OPERATOR',
-    operator_id
+
+    month,
+
+    apply_to: 'CURRENT',
+
+    salary_processed: false
+
   });
 
   await logActivity({
@@ -462,21 +591,23 @@ const addFine = async (employee_id, amount, reason, operator_id) => {
       reason
     }
   });
+
   await globalActivity({
-    operator_id:        operator_id,
-    action_type:        'FINE',
+    operator_id: operator_id,
+    action_type: 'FINE',
     target_employee_id: employee_id,
-    branch_id:          employee.branch_id || null,  // ✅ from employee object
-    metadata:           { amount, reason }
+    branch_id: employee.branch_id || null,
+    metadata: {
+      amount,
+      reason
+    }
   });
-
-
-
 
   return {
     message: 'Fine added successfully',
     amount,
-    employee: `${employee.f_name} ${employee.l_name}`
+    employee:
+      `${employee.f_name} ${employee.l_name}`
   };
 };
 
@@ -714,6 +845,84 @@ const getOperatorProfile = async (operator_id) => {
   };
 };
 
+const addAdvance = async ({
+  employee_id,
+  branch_id,
+  amount,
+  reason,
+  month,
+  added_by
+}) => {
+
+  let existing =
+    await Advance.findOne({
+      employee_id,
+      month
+    });
+
+  if (existing) {
+
+    existing.amount += Number(amount);
+
+    existing.reason =
+      existing.reason
+        ? `${existing.reason}, ${reason}`
+        : reason;
+
+    existing.updated_at =
+      new Date();
+
+    await existing.save();
+
+    return existing;
+  }
+
+  const advance =
+    new Advance({
+
+      advance_id:
+        new mongoose.Types.ObjectId().toString(),
+
+      employee_id,
+      branch_id,
+
+      amount,
+
+      reason,
+
+      month,
+
+      added_by
+    });
+
+  await logActivity({
+    operator_id,
+    branch_id: employee.branch_id,
+    action_type: 'ADVANCE',
+    target_employee_id: employee_id,
+    metadata: {
+      amount,
+      reason
+    }
+  });
+
+  await globalActivity({
+    operator_id: added_by,
+    action_type: 'ADVANCE',
+    target_employee_id: employee_id,
+    branch_id,
+    metadata: {
+      amount,
+      reason,
+      month
+    }
+  });
+
+  await advance.save();
+
+  return advance;
+};  
+
 module.exports = {
   getOperatorDashboard,
   getEmployeeListWithStatus,
@@ -723,5 +932,6 @@ module.exports = {
   addFine,
   getRecentActivity,
   getAttendanceControl,
-  getOperatorProfile
+  getOperatorProfile,
+  addAdvance  
 };

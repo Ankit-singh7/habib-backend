@@ -11,6 +11,7 @@ module.exports.setRouter = (app) => {
      app.post(`${baseUrl}/change-shift`, operatorController.changeShift );
      app.post(`${baseUrl}/change-branch`, operatorController.changeBranch );
      app.post(`${baseUrl}/add-fine`, operatorController.addFine );
+     app.post(`${baseUrl}/add-advance`, operatorController.addAdvance);
      app.get(`${baseUrl}/activity/:operatorId`, operatorController.getRecentActivity);
      app.get(`${baseUrl}/attendance/control`, operatorController.getAttendanceControl);
      app.get(`${baseUrl}/profile/:operatorId`, operatorController.getProfile);

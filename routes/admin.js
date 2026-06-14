@@ -29,11 +29,14 @@ module.exports.setRouter = (app) => {
 
 
     // payroll routes
-    app.get(`${baseUrl}/payroll`, adminController.getPayroll);
-    app.post(`${baseUrl}/payroll/generate`, adminController.generatePayroll);
-    app.post(`${baseUrl}/payroll/lock`, adminController.lockPayroll);
-    app.post(`${baseUrl}/payroll/unlock`, adminController.unlockPayroll);
-    app.post(`${baseUrl}/payroll/paid`, adminController.markAsPaid);
+    app.post(`${baseUrl}/payroll-adjustment/save`, adminController.savePayrollAdjustment);
+    app.get(`${baseUrl}/employee-payroll/preview`, adminController.getEmployeePayrollPreview);
+    app.post(`${baseUrl}/employee-payroll/generate`, adminController.generateEmployeePayroll);
+    app.get(`${baseUrl}/employee-payroll/list`, adminController.getPayrollEmployees);
+    app.post(`${baseUrl}/employee-payroll/lock`, adminController.lockEmployeePayroll);
+    app.post(`${baseUrl}/employee-payroll/paid`, adminController.markEmployeePayrollPaid);
+    app.get(`${baseUrl}/employee-payroll`, adminController.getEmployeePayroll);
+    app.get(`${baseUrl}/employee-payroll/slip`, adminController.getEmployeePayrollSlip);
 
     app.post(`${baseUrl}/employee/salary/bulk-update`, adminController.updateEmployeeSalaries);
 

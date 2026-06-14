@@ -3,20 +3,99 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const payrollEmployeeSchema = new Schema({
-  employee_id:    { type: String },
-  employee_name:  { type: String },
-  branch_id:      { type: String },
-  branch_name:    { type: String },
-  base_salary:    { type: Number, default: 0 },
-  incentive:      { type: Number, default: 0 },
-  fine:           { type: Number, default: 0 },
-  late_deduction: { type: Number, default: 0 },
-  advance:        { type: Number, default: 0 },
-  net_salary:     { type: Number, default: 0 },
-  working_days:   { type: Number, default: 0 },
-  present_days:   { type: Number, default: 0 },
-  absent_days:    { type: Number, default: 0 },
+
+  employee_id: {
+    type: String
+  },
+
+  employee_name: {
+    type: String
+  },
+
+  branch_id: {
+    type: String
+  },
+
+  branch_name: {
+    type: String
+  },
+
+  base_salary: {
+    type: Number,
+    default: 0
+  },
+
+  monthly_minutes: {
+    type: Number,
+    default: 18000
+  },
+
+  per_minute_rate: {
+    type: Number,
+    default: 0
+  },
+
+  worked_minutes: {
+    type: Number,
+    default: 0
+  },
+
+  paid_leave_minutes: {
+    type: Number,
+    default: 0
+  },
+
+  festival_minutes: {
+    type: Number,
+    default: 0
+  },
+
+  payable_minutes: {
+    type: Number,
+    default: 0
+  },
+
+  total_late_minutes: {
+    type: Number,
+    default: 0
+  },
+
+  salary_formula: {
+    type: String,
+    default: ''
+  },
+
+  earned_salary: {
+    type: Number,
+    default: 0
+  },
+
+  incentive: {
+    type: Number,
+    default: 0
+  },
+
+  fine: {
+    type: Number,
+    default: 0
+  },
+
+  late_deduction: {
+    type: Number,
+    default: 0
+  },
+
+  advance: {
+    type: Number,
+    default: 0
+  },
+
+  net_salary: {
+    type: Number,
+    default: 0
+  }
 }, { _id: false });
+
 
 let payrollSchema = new Schema({
   payroll_id: { type: String, unique: true, index: true },
@@ -35,10 +114,7 @@ let payrollSchema = new Schema({
   locked_at:    { type: Date, default: null },
   paid_at:      { type: Date, default: null },
   created_at:   { type: Date, default: Date.now },
-  updated_at:   { type: Date, default: Date.now },
-  per_day_salary:   { type: Number, default: 0 },
-  earned_salary:    { type: Number, default: 0 },
-  absent_deduction: { type: Number, default: 0 },
+  updated_at:   { type: Date, default: Date.now }
 });
 
 payrollSchema.index({ month: 1, branch_id: 1 }, { unique: true });
