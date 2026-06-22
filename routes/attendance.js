@@ -14,7 +14,9 @@ module.exports.setRouter = (app) => {
 
     app.get(`${baseUrl}/locations`, attendanceController.getBranchesWithLocation);
 
-    app.get(`${baseUrl}/employee/payroll/:employee_id`, attendanceController.getEmployeePayroll);
+    app.get(`${baseUrl}/employee/payroll/list/:employee_id`, attendanceController.getEmployeePayroll);
+
+    app.get(`${baseUrl}/employee/payroll-slip`, attendanceController.getEmployeePayrollSlip);
 
     app.get(`${appConfig.apiVersion}/employee/activity/:employeeId`, attendanceController.getEmployeeActivity);
 

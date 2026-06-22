@@ -4,7 +4,7 @@ const moment = require('moment');
 const User = mongoose.model('user');
 const Attendance = mongoose.model('attendance');
 const Branch = mongoose.model('branch');
-const Fine = mongoose.model('fine');
+// const Fine = mongoose.model('fine');
 const Salary = mongoose.model('salary');
 const { uploadToDrive, createEmployeeFolder, createRootFolder } = require('../service/google-drive.service');
 let ROOT_FOLDER_ID = "1W5m6_WUZDGV_WbusPQtCLQe9rYNBSX4k";
@@ -13,6 +13,7 @@ const Advance = mongoose.model('advance');
 const { globalActivity } = require('../libs/loggerLib')
 const PayrollAdjustment = mongoose.model('payroll_adjustment');
 const EmployeePayroll = mongoose.model('employee_payroll');
+const Fine = mongoose.model('employee_fine');
 
 const getAdminDashboard = async (branch_id) => {
 
@@ -508,41 +509,44 @@ const adminOverwriteAttendance = async (
 };
 
 const saveIncentive = async (data) => {
-  const { employee_id, branch_id, amount, reason, month, added_by } = data;
 
-  // ✅ Check if already exists for this employee + month
-  let existing = await Incentive.findOne({ employee_id, month });
-
-  if (existing) {
-    // ✅ Update existing
-    existing.amount = amount;
-    existing.reason = reason;
-    existing.added_by = added_by;
-    existing.updated_at = new Date();
-    await existing.save();
-    return existing;
-  }
-
-  // ✅ Create new
-  const incentive = new Incentive({
-    incentive_id: new mongoose.Types.ObjectId().toString(),
+  const {
     employee_id,
     branch_id,
     amount,
     reason,
     month,
     added_by
+  } = data;
+
+  const incentive = new Incentive({
+
+    incentive_id:
+      new mongoose.Types.ObjectId().toString(),
+
+    employee_id,
+    branch_id,
+    amount,
+    reason,
+    month,
+    added_by
+
   });
 
   await globalActivity({
     operator_id: 'admin',
     action_type: 'INCENTIVE',
     target_employee_id: employee_id,
-    branch_id: branch_id,
-    metadata: { amount, reason, month }
+    branch_id,
+    metadata: {
+      amount,
+      reason,
+      month
+    }
   });
 
   await incentive.save();
+
   return incentive;
 };
 
@@ -557,39 +561,44 @@ const removeIncentive = async (incentive_id) => {
 };
 
 const saveAdvance = async (data) => {
-  const { employee_id, branch_id, amount, reason, month, added_by } = data;
 
-  // ✅ Check if already exists for this employee + month
-  let existing = await Advance.findOne({ employee_id, month });
-
-  if (existing) {
-    existing.amount = amount;
-    existing.reason = reason;
-    existing.added_by = added_by;
-    existing.updated_at = new Date();
-    await existing.save();
-    return existing;
-  }
-
-  const advance = new Advance({
-    advance_id: new mongoose.Types.ObjectId().toString(),
+  const {
     employee_id,
     branch_id,
     amount,
     reason,
     month,
     added_by
+  } = data;
+
+  const advance = new Advance({
+
+    advance_id:
+      new mongoose.Types.ObjectId().toString(),
+
+    employee_id,
+    branch_id,
+    amount,
+    reason,
+    month,
+    added_by
+
   });
 
   await globalActivity({
     operator_id: 'admin',
     action_type: 'ADVANCE',
     target_employee_id: employee_id,
-    branch_id: branch_id,
-    metadata: { amount, reason, month }
+    branch_id,
+    metadata: {
+      amount,
+      reason,
+      month
+    }
   });
 
   await advance.save();
+
   return advance;
 };
 

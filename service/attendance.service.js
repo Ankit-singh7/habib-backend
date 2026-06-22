@@ -5,6 +5,7 @@ const Attendance = mongoose.model('attendance');
 const Deduction = mongoose.model('deduction');
 const Payroll = mongoose.model('payroll');
 const User = mongoose.model('user');
+const EmployeePayroll = mongoose.model('employee_payroll');
 
 const calculateDeduction = (lateMinutes, rules = []) => {
   let deduction = 0;
@@ -293,41 +294,62 @@ const getBranchesWithLocation = async () => {
   return branches;
 };
 
-const getEmployeePayroll = async (employee_id) => {
-  const payrolls = await Payroll.find(
-    {
-      status: 'PAID',
-      'employees.employee_id': employee_id
-    },
-    { month: 1, status: 1, employees: 1 }
-  ).sort({ month: -1 }).lean();
+const getEmployeePayrollList = async (
+  employee_id
+) => {
 
-  const result = payrolls.map((p) => {
-    const emp = p.employees.find(
-      (e) => e.employee_id === employee_id
-    );
+  const payrolls =
+    await EmployeePayroll.find({
 
-    if (!emp) return null;
+      employee_id,
 
-    return {
-      month:          p.month,
-      status:         p.status,
-      base:           emp.base_salary,
-      per_day_salary: emp.per_day_salary || Math.round(emp.base_salary / (emp.working_days || 26)),
-      earned_salary:  emp.earned_salary  || emp.net_salary, // ✅ fallback for old records
-      incentives:     emp.incentive,
-      fines:          emp.fine,
-      late_deduction: emp.late_deduction,
-      advance:        emp.advance,
-      net:            emp.net_salary,
-      present_days:   emp.present_days,
-      absent_days:    emp.absent_days,
-      working_days:   emp.working_days,
-      branch:         emp.branch_name
-    };
-  }).filter(Boolean);
+      status: {
+        $in: ['GENERATED', 'LOCKED', 'PAID']
+      }
 
-  return result;
+    })
+      .sort({
+        month: -1
+      })
+      .lean();
+
+return payrolls.map(item => ({
+
+  payroll_id:
+    item.payroll_id,
+
+  month:
+    item.month,
+
+  net_salary:
+    item.net_salary,
+
+  status:
+    item.status,
+
+  worked_minutes:
+    item.worked_minutes || 0,
+
+  total_late_minutes:
+    item.total_late_minutes || 0,
+
+  incentive:
+    item.incentive || 0,
+
+  advance:
+    item.advance || 0,
+
+  fine:
+    item.fine || 0,
+
+  branch_name:
+    item.branch_name || '',
+
+  generated_at:
+    item.generated_at
+
+}));
+
 };
 
 // In attendance.service.js or new activity.service.js
@@ -441,4 +463,4 @@ const formatActivityMessage = (actionType, metadata, operatorName, employeeName,
   }
 };
 
-module.exports = { punch, getDashboard, getAttendanceList, getBranchesWithLocation, getEmployeePayroll, getEmployeeActivity };
+module.exports = { punch, getDashboard, getAttendanceList, getBranchesWithLocation, getEmployeePayrollList, getEmployeeActivity };

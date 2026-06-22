@@ -577,7 +577,11 @@ const addFine = async (
 
     apply_to: 'CURRENT',
 
-    salary_processed: false
+    salary_processed: false,
+
+    added_by: operator_id,
+
+    fine_date: new Date()
 
   });
 

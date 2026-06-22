@@ -1,5 +1,6 @@
 const attendanceService = require('../service/attendance.service');
 const { uploadPunchPhoto } = require('../service/google-drive.service');
+const adminService = require('../service/admin.service');
 
 // 🔥 Punch API
 exports.punch = async (req, res) => {
@@ -103,7 +104,7 @@ exports.getEmployeePayroll = async (req, res) => {
   try {
     const { employee_id } = req.params;
 
-    const result = await attendanceService.getEmployeePayroll(employee_id);
+    const result = await attendanceService.getEmployeePayrollList(employee_id);
 
     res.status(200).send({
       error: false,
@@ -118,6 +119,47 @@ exports.getEmployeePayroll = async (req, res) => {
     });
   }
 };
+
+exports.getEmployeePayrollSlip = async (req, res) => {
+
+    try {
+
+      const {
+        employee_id,
+        month
+      } = req.query;
+
+      const data =
+        await adminService.getEmployeePayrollSlip(
+            employee_id,
+            month
+          );
+
+      res.send({
+
+        error: false,
+
+        message:
+          'Salary slip fetched',
+
+        data
+
+      });
+
+    } catch (err) {
+
+      res.status(500).send({
+
+        error: true,
+
+        message:
+          err.message
+
+      });
+
+    }
+
+  };
 
 exports.getEmployeeActivity = async (req, res) => {
   try {

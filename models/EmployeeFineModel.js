@@ -42,7 +42,24 @@ let fineSchema = new Schema({
   created_at: {
     type: Date,
     default: Date.now
-  }
+  },
+
+    month: {
+    type: String, // YYYY-MM
+    required: true,
+    index: true
+  },
+
+    apply_to: {
+    type: String,
+    enum: ['CURRENT', 'NEXT'],
+    default: 'CURRENT'
+  },
+  salary_processed: {
+    type: Boolean,
+    default: false
+  },
+
 
 });
 
