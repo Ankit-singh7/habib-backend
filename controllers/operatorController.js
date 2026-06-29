@@ -1,4 +1,5 @@
 const operatorService = require('../service/operator.service');
+const { uploadPunchPhoto } = require('../service/google-drive.service');
 
 exports.getDashboard = async (req, res) => {
     try {
@@ -39,34 +40,84 @@ exports.getEmployeeList = async (req, res) => {
 };
 
 exports.operatorPunch = async (req, res) => {
-    try {
+  try {
 
-        const { employee_id, operator_id } = req.body;
+    const {
+      employee_id,
+      operator_id
+    } = req.body;
 
-        if (!employee_id || !operator_id) {
-            return res.status(400).send({
-                error: true,
-                message: 'employee_id and operator_id are required'
-            });
-        }
-
-        const data = await operatorService.operatorPunch(
-            employee_id,
-            operator_id
-        );
-
-        res.status(200).send({
-            error: false,
-            message: data.message,
-            data
-        });
-
-    } catch (err) {
-        res.status(500).send({
-            error: true,
-            message: err.message
-        });
+    if (!employee_id || !operator_id) {
+      return res.status(400).send({
+        error: true,
+        message: 'employee_id and operator_id are required'
+      });
     }
+
+    let photoUrl = null;
+
+    if (req.file) {     
+      photoUrl = await uploadPunchPhoto(
+        req.file.buffer,
+        employee_id,
+        'PUNCH'
+      );
+    }
+
+    const data = await operatorService.operatorPunch(
+      employee_id,
+      operator_id,
+      photoUrl
+    );
+
+    res.status(200).send({
+      error: false,
+      message: data.message,
+      data
+    });
+
+  } catch (err) {
+
+    res.status(500).send({
+      error: true,
+      message: err.message
+    });
+
+  }
+};
+
+// 🔥 Punch API — Operator
+exports.punch = async (req, res) => {
+  try {
+    const { employee_id, branch_id } = req.body;
+
+    let photoUrl = null;
+    if (req.file) {
+      photoUrl = await uploadPunchPhoto(
+        req.file.buffer,
+        employee_id,
+        'PUNCH'
+      );
+    }
+
+    const result = await operatorService.punch(
+      employee_id,
+      branch_id,
+      photoUrl
+    );
+
+    res.status(200).send({
+      error: false,
+      message: result.message,
+      data: result
+    });
+
+  } catch (err) {
+    res.status(500).send({
+      error: true,
+      message: err.message || 'Something went wrong'
+    });
+  }
 };
 
 exports.changeShift = async (req, res) => {

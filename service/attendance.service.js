@@ -218,17 +218,14 @@ const getDashboard = async (employee_id) => {
 
   while (current.isSameOrBefore(todayMoment, 'day')) {
     const dateStr = current.format('YYYY-MM-DD');
-    const isWeekend = current.day() === 0; // ✅ skip Sundays (optional)
 
-    if (!isWeekend) {
-      if (recordMap[dateStr]) {
-        totalMinutes += recordMap[dateStr].total_hours || 0;
-        present++;
-      } else {
-        // ✅ Only count as absent if day has passed
-        if (current.isBefore(todayMoment, 'day')) {
-          absent++;
-        }
+    // ✅ All days including Sundays are work days
+    if (recordMap[dateStr]) {
+      totalMinutes += recordMap[dateStr].total_hours || 0;
+      present++;
+    } else {
+      if (current.isBefore(todayMoment, 'day')) {
+        absent++;
       }
     }
 
@@ -237,8 +234,8 @@ const getDashboard = async (employee_id) => {
 
   // ✅ Get last session for display
   const sessions = todayAttendance && todayAttendance.sessions
-  ? todayAttendance.sessions
-  : [];
+    ? todayAttendance.sessions
+    : [];
   const lastSession = sessions[sessions.length - 1] || null;
 
   return {
@@ -249,7 +246,7 @@ const getDashboard = async (employee_id) => {
       late_minutes: todayAttendance.late_minutes || 0,
       deduction: todayAttendance.deduction_amount || 0,
       status: todayAttendance.is_active ? 'Active' : 'Completed',
-      sessions: sessions  // ✅ send all sessions if needed for history
+      sessions: sessions
     } : null,
     summary: {
       hours: totalMinutes,

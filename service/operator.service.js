@@ -26,50 +26,162 @@ const calculateDeduction = (lateMinutes, rules = []) => {
 
 const getOperatorDashboard = async (operatorId) => {
 
-  // 🔹 Step 1: Get operator details
+  // =====================================================
+  // Existing Operator Dashboard Logic
+  // =====================================================
+
   const operator = await User.findOne(
     { user_id: operatorId },
-    { branch_id: 1, role: 1 }
+    {
+      branch_id: 1,
+      role: 1
+    }
   );
 
   if (!operator) {
     throw new Error('Operator not found');
   }
-  // 🔹 Step 2: Get all ACTIVE employees in branch
+
   const employees = await User.find(
     {
       role: 'employee',
       status: 'Active'
     },
-    { user_id: 1 }
+    {
+      user_id: 1
+    }
   );
+
   const employeeIds = employees.map(e => e.user_id);
 
   const totalEmployees = employeeIds.length;
 
-  // 🔹 Step 3: Get today's attendance
   const today = moment().format('YYYY-MM-DD');
 
   const attendance = await Attendance.find(
     {
-      employee_id: { $in: employeeIds },
+      employee_id: {
+        $in: employeeIds
+      },
       attendance_date: today
     },
-    { employee_id: 1, is_active: 1 }
+    {
+      employee_id: 1,
+      is_active: 1
+    }
   );
 
-  // 🔹 Step 4: Calculate metrics
   const presentToday = attendance.length;
 
   const pendingPunchOut = attendance.reduce((count, record) => {
     return record.is_active ? count + 1 : count;
   }, 0);
 
+  // =====================================================
+  // NEW : OPERATOR'S OWN ATTENDANCE
+  // =====================================================
+
+  const monthStart = moment()
+    .startOf('month')
+    .format('YYYY-MM-DD');
+
+  const operatorTodayAttendance = await Attendance.findOne({
+    employee_id: operatorId,
+    attendance_date: today
+  });
+
+  const operatorAttendance = await Attendance.find({
+    employee_id: operatorId,
+    attendance_date: {
+      $gte: monthStart,
+      $lte: today
+    }
+  });
+
+  const attendanceMap = {};
+
+  operatorAttendance.forEach(record => {
+    attendanceMap[record.attendance_date] = record;
+  });
+
+  let current = moment(monthStart);
+  const todayMoment = moment();
+
+  let totalMinutes = 0;
+  let present = 0;
+  let absent = 0;
+
+  while (current.isSameOrBefore(todayMoment, 'day')) {
+
+    const date = current.format('YYYY-MM-DD');
+
+    // ✅ All days including Sundays are work days
+    if (attendanceMap[date]) {
+      totalMinutes += attendanceMap[date].total_hours || 0;
+      present++;
+    } else {
+      if (current.isBefore(todayMoment, 'day')) {
+        absent++;
+      }
+    }
+
+    current.add(1, 'day');
+  }
+
+  const sessions =
+    operatorTodayAttendance?.sessions || [];
+
+  const lastSession =
+    sessions[sessions.length - 1] || null;
+
+  // =====================================================
+  // RESPONSE
+  // =====================================================
+
   return {
+
+    // Existing fields (UNCHANGED)
     totalEmployees,
     presentToday,
-    pendingPunchOut
+    pendingPunchOut,
+
+    // New Employee-like Dashboard Data
+    today: operatorTodayAttendance
+      ? {
+
+          punch_in:
+            lastSession?.punch_in || null,
+
+          punch_out:
+            lastSession?.punch_out || null,
+
+          total_hours:
+            operatorTodayAttendance.total_hours || 0,
+
+          late_minutes:
+            operatorTodayAttendance.late_minutes || 0,
+
+          deduction:
+            operatorTodayAttendance.deduction_amount || 0,
+
+          status:
+            operatorTodayAttendance.is_active
+              ? 'Active'
+              : 'Completed',
+
+          sessions
+
+        }
+      : null,
+
+    summary: {
+      hours: totalMinutes,
+      present,
+      absent
+    }
+
   };
+
 };
 
 const getEmployeeListWithStatus = async () => {
@@ -163,7 +275,11 @@ const getEmployeeListWithStatus = async () => {
   });
 };
 
-const operatorPunch = async (employee_id, operator_id) => {
+const operatorPunch = async (
+  employee_id,
+  operator_id,
+  photoUrl = null
+) => {
 
   const now = new Date();
   const attendance_date = moment(now).format('YYYY-MM-DD');
@@ -176,6 +292,10 @@ const operatorPunch = async (employee_id, operator_id) => {
       branch_id: 1
     }
   );
+
+  if (!employee) {
+    throw new Error('Employee not found');
+  }
 
   // Today's attendance
   let record = await Attendance.findOne({
@@ -193,7 +313,6 @@ const operatorPunch = async (employee_id, operator_id) => {
 
     // Calculate late only if shift time exists
     if (
-      employee &&
       employee.shift_time &&
       employee.shift_time.trim() !== ''
     ) {
@@ -216,32 +335,39 @@ const operatorPunch = async (employee_id, operator_id) => {
         );
       }
 
-      const deductionConfig = await Deduction.findOne({});
+      const deductionConfig =
+        await Deduction.findOne({});
 
-      deductionAmount = calculateDeduction(
-        lateMinutes,
-        deductionConfig?.rules || []
-      );
+      deductionAmount =
+        calculateDeduction(
+          lateMinutes,
+          deductionConfig?.rules || []
+        );
     }
 
     record = new Attendance({
-      attendance_id: new mongoose.Types.ObjectId().toString(),
+
+      attendance_id:
+        new mongoose.Types.ObjectId().toString(),
 
       employee_id,
 
       branch_id:
-        employee?.branch_id || null,
+        employee.branch_id || null,
 
       attendance_date,
 
       shift_time:
-        employee?.shift_time || null,
+        employee.shift_time || null,
 
-      sessions: [{
-        punch_in: now,
-        punch_out: null,
-        duration: 0
-      }],
+      sessions: [
+        {
+          punch_in: now,
+          punch_out: null,
+          duration: 0,
+          punch_in_photo: photoUrl
+        }
+      ],
 
       total_hours: 0,
 
@@ -250,15 +376,18 @@ const operatorPunch = async (employee_id, operator_id) => {
           ? 'LATE'
           : 'PRESENT',
 
-      late_minutes: lateMinutes,
+      late_minutes:
+        lateMinutes,
 
-      deduction_amount: deductionAmount,
+      deduction_amount:
+        deductionAmount,
 
       is_active: true,
 
       punch_by: 'OPERATOR',
 
       operator_id
+
     });
 
     await record.save();
@@ -295,14 +424,15 @@ const operatorPunch = async (employee_id, operator_id) => {
   // ============================================
   if (record.is_active) {
 
-    const activeSession = record.sessions
-      .slice()
-      .reverse()
-      .find(
-        s =>
-          s.punch_in &&
-          !s.punch_out
-      );
+    const activeSession =
+      record.sessions
+        .slice()
+        .reverse()
+        .find(
+          s =>
+            s.punch_in &&
+            !s.punch_out
+        );
 
     if (activeSession) {
 
@@ -316,21 +446,37 @@ const operatorPunch = async (employee_id, operator_id) => {
 
       activeSession.punch_out = now;
       activeSession.duration = duration;
+      activeSession.punch_out_photo = photoUrl;
     }
 
-    const totalMinutes = record.sessions.reduce(
-      (sum, session) =>
-        sum + (session.duration || 0),
-      0
-    );
+    const totalMinutes =
+      record.sessions.reduce(
+        (
+          sum,
+          session
+        ) =>
+          sum +
+          (session.duration || 0),
+        0
+      );
 
-    record.total_hours = totalMinutes;
+    record.total_hours =
+      totalMinutes;
+
     record.is_active = false;
-    record.punch_by = 'OPERATOR';
-    record.operator_id = operator_id;
-    record.updated_at = now;
 
-    record.markModified('sessions');
+    record.punch_by =
+      'OPERATOR';
+
+    record.operator_id =
+      operator_id;
+
+    record.updated_at =
+      now;
+
+    record.markModified(
+      'sessions'
+    );
 
     await record.save();
 
@@ -367,17 +513,30 @@ const operatorPunch = async (employee_id, operator_id) => {
   // SUBSEQUENT PUNCH IN
   // ============================================
   record.sessions.push({
+
     punch_in: now,
+
     punch_out: null,
-    duration: 0
+
+    duration: 0,
+
+    punch_in_photo: photoUrl
+
   });
 
   record.is_active = true;
-  record.punch_by = 'OPERATOR';
-  record.operator_id = operator_id;
-  record.updated_at = now;
 
-  record.markModified('sessions');
+  record.punch_by = 'OPERATOR';
+
+  record.operator_id =
+    operator_id;
+
+  record.updated_at =
+    now;
+
+  record.markModified(
+    'sessions'
+  );
 
   await record.save();
 
@@ -401,6 +560,157 @@ const operatorPunch = async (employee_id, operator_id) => {
       time: now
     }
   });
+
+  return {
+    type: 'PUNCH_IN',
+    message: 'Punch In successful'
+  };
+
+};
+
+// ============================================
+// 🔥 PUNCH IN / PUNCH OUT — Operator
+// ============================================
+
+const punch = async (employee_id, branch_id, photoUrl = null) => {
+
+  const now = new Date();
+  const attendance_date = moment(now).format('YYYY-MM-DD');
+
+  // ✅ Use Admin/Operator model instead of User
+  const operator = await User.findOne(
+    { user_id: employee_id },
+    { shift_time: 1 }
+  );
+
+  let record = await Attendance.findOne({
+    employee_id,
+    attendance_date
+  });
+
+  // ==========================================
+  // FIRST PUNCH IN
+  // ==========================================
+  if (!record) {
+
+    let lateMinutes = 0;
+    let deductionAmount = 0;
+
+    if (
+      operator &&
+      operator.shift_time &&
+      operator.shift_time.trim() !== ''
+    ) {
+      const [hours, minutes] = operator.shift_time
+        .split(':')
+        .map(Number);
+
+      const shiftStart = moment(now)
+        .startOf('day')
+        .add(hours, 'hours')
+        .add(minutes, 'minutes');
+
+      const actualIn = moment(now);
+
+      if (actualIn.isAfter(shiftStart)) {
+        lateMinutes = actualIn.diff(shiftStart, 'minutes');
+      }
+
+      const deductionConfig = await Deduction.findOne({});
+
+      deductionAmount = calculateDeduction(
+        lateMinutes,
+        deductionConfig?.rules || []
+      );
+    }
+
+    record = new Attendance({
+      attendance_id: new mongoose.Types.ObjectId().toString(),
+
+      employee_id,
+      branch_id,
+      attendance_date,
+      shift_time: operator?.shift_time || null,
+
+      sessions: [{
+        punch_in: now,
+        punch_out: null,
+        duration: 0,
+        punch_in_photo: photoUrl
+      }],
+
+      total_hours: 0,
+
+      status: lateMinutes > 0 ? 'LATE' : 'PRESENT',
+
+      late_minutes: lateMinutes,
+      deduction_amount: deductionAmount,
+
+      is_active: true
+    });
+
+    await record.save();
+
+    return {
+      type: 'PUNCH_IN',
+      message: 'Punch In successful'
+    };
+  }
+
+  // ==========================================
+  // PUNCH OUT
+  // ==========================================
+  if (record.is_active) {
+
+    const activeSession = record.sessions
+      .slice()
+      .reverse()
+      .find(s => s.punch_in && !s.punch_out);
+
+    if (activeSession) {
+      const duration = Math.floor(
+        (now - new Date(activeSession.punch_in)) / (1000 * 60)
+      );
+
+      activeSession.punch_out = now;
+      activeSession.duration = duration;
+      activeSession.punch_out_photo = photoUrl;
+    }
+
+    const totalMinutes = record.sessions.reduce(
+      (sum, session) => sum + (session.duration || 0),
+      0
+    );
+
+    record.total_hours = totalMinutes;
+    record.is_active = false;
+    record.updated_at = new Date();
+
+    record.markModified('sessions');
+    await record.save();
+
+    return {
+      type: 'PUNCH_OUT',
+      message: 'Punch Out successful',
+      total_hours: totalMinutes
+    };
+  }
+
+  // ==========================================
+  // SUBSEQUENT PUNCH IN
+  // ==========================================
+  record.sessions.push({
+    punch_in: now,
+    punch_out: null,
+    duration: 0,
+    punch_in_photo: photoUrl
+  });
+
+  record.is_active = true;
+  record.updated_at = new Date();
+
+  record.markModified('sessions');
+  await record.save();
 
   return {
     type: 'PUNCH_IN',
@@ -937,5 +1247,6 @@ module.exports = {
   getRecentActivity,
   getAttendanceControl,
   getOperatorProfile,
-  addAdvance  
+  addAdvance,
+  punch
 };

@@ -113,7 +113,7 @@ const uploadPunchPhoto = async (fileBuffer, employeeId, punchType) => {
     requestBody: { role: 'reader', type: 'anyone' }
   });
 
-  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
+  return `https://drive.google.com/file/d/${fileId}/preview`;
 };
 
 module.exports = {

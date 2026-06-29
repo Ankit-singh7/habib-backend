@@ -21,9 +21,9 @@ const getAdminDashboard = async (branch_id) => {
   const startOfMonth = moment().startOf('month').toDate();
   const endOfMonth = moment().endOf('month').toDate();
 
-  // 🔥 Dynamic filter
+  // ✅ Now includes both employee and operator
   const userFilter = {
-    role: 'employee',
+    role: { $in: ['employee', 'operator'] },
     status: 'Active',
     ...(branch_id && { branch_id })
   };
@@ -31,24 +31,18 @@ const getAdminDashboard = async (branch_id) => {
   const employees = await User.find(userFilter, { user_id: 1 });
   const employeeIds = employees.map(e => e.user_id);
 
-  // 🔹 Total Employees
   const totalEmployees = employeeIds.length;
-
-  // 🔹 Total Branches
   const totalBranches = await Branch.countDocuments();
 
-  // 🔹 Today Attendance
   const todayAttendance = await Attendance.find({
     employee_id: { $in: employeeIds },
     attendance_date: today
   });
 
   const todayPresent = todayAttendance.length;
-
   const todayIn = todayAttendance.filter(a => a.is_active).length;
   const todayOut = todayAttendance.filter(a => !a.is_active).length;
 
-  // 🔹 Monthly Fines
   const fines = await Fine.aggregate([
     {
       $match: {
@@ -56,23 +50,16 @@ const getAdminDashboard = async (branch_id) => {
         created_at: { $gte: startOfMonth, $lte: endOfMonth }
       }
     },
-    {
-      $group: {
-        _id: null,
-        total: { $sum: '$amount' }
-      }
-    }
+    { $group: { _id: null, total: { $sum: '$amount' } } }
   ]);
 
   const totalFines = fines.length ? fines[0].total : 0;
 
-  // 🔹 Pending Salary
   const pendingSalary = await Salary.countDocuments({
     employee_id: { $in: employeeIds },
     status: 'PENDING'
   });
 
-  // 🔹 Payroll
   const payroll = await Salary.aggregate([
     {
       $match: {
@@ -80,17 +67,10 @@ const getAdminDashboard = async (branch_id) => {
         created_at: { $gte: startOfMonth, $lte: endOfMonth }
       }
     },
-    {
-      $group: {
-        _id: null,
-        total: { $sum: '$net_salary' }
-      }
-    }
+    { $group: { _id: null, total: { $sum: '$net_salary' } } }
   ]);
 
   const totalPayroll = payroll.length ? payroll[0].total : 0;
-
-  // 🔹 Incentives (optional → placeholder if not built yet)
   const totalIncentives = 0;
 
   return {
@@ -100,7 +80,6 @@ const getAdminDashboard = async (branch_id) => {
       todayPresent,
       pendingSalary
     },
-
     monthly: {
       todayIn,
       todayOut,
@@ -1066,98 +1045,46 @@ const generateEmployeePayroll = async (
   return payroll;
 };
 
-const getPayrollEmployees = async (
-  month,
-  branch_id = ''
-) => {
+const getPayrollEmployees = async (month, branch_id = '') => {
 
+  // ✅ Include both employee and operator
   const employeeFilter = {
-    role: 'employee'
+    role: { $in: ['employee', 'operator'] }
   };
 
   if (branch_id) {
     employeeFilter.branch_id = branch_id;
   }
 
-  const employees =
-    await User.find(
-      employeeFilter
-    )
-      .select(
-        'user_id f_name l_name branch_id branch_name salary designation'
-      )
-      .lean();
+  const employees = await User.find(employeeFilter)
+    .select('user_id f_name l_name branch_id branch_name salary designation role')
+    .lean();
 
-  const payrolls =
-    await EmployeePayroll.find({
-      month
-    }).lean();
+  const payrolls = await EmployeePayroll.find({ month }).lean();
 
-  const payrollMap =
-    new Map();
+  const payrollMap = new Map();
+  payrolls.forEach(payroll => payrollMap.set(payroll.employee_id, payroll));
 
-  payrolls.forEach((payroll) => {
+  return employees.map(employee => {
 
-    payrollMap.set(
-      payroll.employee_id,
-      payroll
-    );
-
-  });
-
-  return employees.map((employee) => {
-
-    const payroll =
-      payrollMap.get(
-        employee.user_id
-      );
+    const payroll = payrollMap.get(employee.user_id);
 
     return {
-
-      employee_id:
-        employee.user_id,
-
-      employee_name:
-        `${employee.f_name || ''} ${employee.l_name || ''}`.trim(),
-
-      branch_id:
-        employee.branch_id,
-
-      branch_name:
-        employee.branch_name,
-
-      designation:
-        employee.designation,
-
-      salary:
-        employee.salary || 0,
-
-      payroll_generated:
-        !!payroll,
-
-      payroll_status:
-        payroll
-          ? payroll.status
-          : 'NOT_GENERATED',
-
-      net_salary:
-        payroll
-          ? payroll.net_salary
-          : 0,
-
-      generated_at:
-        payroll?.generated_at || null,
-
-      paid_at:
-        payroll?.paid_at || null,
-
-      locked_at:
-        payroll?.locked_at || null
-
+      employee_id: employee.user_id,
+      employee_name: `${employee.f_name || ''} ${employee.l_name || ''}`.trim(),
+      branch_id: employee.branch_id,
+      branch_name: employee.branch_name,
+      designation: employee.designation,
+      role: employee.role, // ✅ include role so frontend can differentiate
+      salary: employee.salary || 0,
+      payroll_generated: !!payroll,
+      payroll_status: payroll ? payroll.status : 'NOT_GENERATED',
+      net_salary: payroll ? payroll.net_salary : 0,
+      generated_at: payroll?.generated_at || null,
+      paid_at: payroll?.paid_at || null,
+      locked_at: payroll?.locked_at || null
     };
-
   });
-
 };
 
 const lockEmployeePayroll = async (
@@ -1272,7 +1199,6 @@ const getEmployeePayroll = async (
 
 const updateEmployeeSalaries = async (updates, admin_id) => {
 
-  // 🔥 Validate input
   const validUpdates = updates.filter(u =>
     u.employee_id && typeof u.salary === 'number'
   );
@@ -1281,10 +1207,14 @@ const updateEmployeeSalaries = async (updates, admin_id) => {
     throw new Error('No valid salary updates found');
   }
 
-  // 🔥 Prepare bulk operations
   const bulkOps = validUpdates.map(u => ({
     updateOne: {
-      filter: { user_id: u.employee_id, role: 'employee', status: 'Active' },
+      filter: {
+        user_id: u.employee_id,
+        // ✅ Allow both employee and operator
+        role: { $in: ['employee', 'operator'] },
+        status: 'Active'
+      },
       update: {
         $set: {
           salary: u.salary,
@@ -1295,7 +1225,6 @@ const updateEmployeeSalaries = async (updates, admin_id) => {
     }
   }));
 
-  // 🔥 Execute bulk update
   const result = await User.bulkWrite(bulkOps);
 
   return {
@@ -1320,9 +1249,13 @@ const getAdminActivity = async (branch_id, limit = 50) => {
     ...logs.map(l => l.target_employee_id)
   ].filter(Boolean))];
 
+  // ✅ Fetch both employees and operators for name resolution
   const users = await User.find(
-    { user_id: { $in: userIds } },
-    { user_id: 1, f_name: 1, l_name: 1 }
+    {
+      user_id: { $in: userIds },
+      role: { $in: ['employee', 'operator'] }
+    },
+    { user_id: 1, f_name: 1, l_name: 1, role: 1 }
   ).lean();
 
   const userMap = {};
@@ -1336,7 +1269,8 @@ const getAdminActivity = async (branch_id, limit = 50) => {
     metadata: log.metadata,
     created_at: log.created_at,
     message: formatActivityMessage(
-      log.action_type, log.metadata,
+      log.action_type,
+      log.metadata,
       userMap[log.operator_id],
       userMap[log.target_employee_id],
       'admin'
@@ -1552,7 +1486,10 @@ const getEmployeePayrollSlip = async (
         employee.designation,
 
       phone:
-        employee.phone
+        employee.phone,
+
+       shift_time:
+    employee.shift_time || null  // ✅ added
 
     },
 
